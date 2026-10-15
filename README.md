@@ -21,7 +21,19 @@ Built with React, Node.js, Express.js, and MongoDB, DriveX focuses on **user-lev
 - User-scoped database records help prevent unauthorized cross-account access.
 - Authentication and authorization checks are handled by the backend, not just the frontend.
 
-### 📁 2. Personal Drive & File Management
+### 🛡️ 2. Privacy & Safety
+
+- Private files are associated with their owner and should not be accessible to other users by default.
+- Access to shared files and folders is controlled through Viewer and Editor permissions.
+- Authentication tokens are handled using HTTP-only cookies.
+- Passwords are hashed before being stored.
+- Protected operations perform server-side authentication and authorization checks.
+- Revoking a user's sharing access should remove their permission to access the shared resource.
+- Sensitive configuration such as database credentials and JWT secrets belongs in environment variables, not source control.
+
+**Privacy boundary:** DriveX provides application-level access controls; this does not by itself guarantee end-to-end encryption, encryption at rest, or an independent security audit.
+
+### 📁 3. Personal Drive & File Management
 
 - Upload and download files.
 - Create and manage folders.
@@ -32,7 +44,7 @@ Built with React, Node.js, Express.js, and MongoDB, DriveX focuses on **user-lev
 - Allow multiple files with the same filename.
 - Track file metadata, including names, sizes, and dates.
 
-### 🌳 3. Nested Folder System
+### 🌳 4. Nested Folder System
 
 - Create folders inside other folders.
 - Navigate through a hierarchical folder structure.
@@ -40,7 +52,7 @@ Built with React, Node.js, Express.js, and MongoDB, DriveX focuses on **user-lev
 - Keep files associated with their intended parent folders.
 - Perform folder operations with backend ownership checks.
 
-### 🕘 4. File Version History
+### 🕘 5. File Version History
 
 - Maintain previous versions of files.
 - Upload a new version of an existing file.
@@ -51,7 +63,7 @@ Built with React, Node.js, Express.js, and MongoDB, DriveX focuses on **user-lev
 
 **Why it matters:** Version history helps users recover earlier file contents instead of relying on a single overwritten copy.
 
-### 🤝 5. Manage Access & File Sharing
+### 🤝 6. Manage Access & File Sharing
 
 - Share files and folders with other users through the access-management system.
 - Assign **Viewer** or **Editor** permissions.
@@ -62,26 +74,26 @@ Built with React, Node.js, Express.js, and MongoDB, DriveX focuses on **user-lev
 
 **Granular access control:** Sharing an item should not grant unrestricted access to unrelated users' files or folders.
 
-### 🔎 6. Advanced Search
+### 🔎 7. Advanced Search
 
 - Search for files by available metadata.
 - Find files without manually navigating every folder.
 - Narrow down file discovery using the available search functionality.
 - Support a more efficient workflow as the number of stored files grows.
 
-### ⭐ 7. Starred Items
+### ⭐ 8. Starred Items
 
 - Star important files and folders.
 - Unstar items when they are no longer important.
 - Quickly identify frequently used content.
 
-### 🗑️ 8. Trash & Recovery
+### 🗑️ 9. Trash & Recovery
 
 - Manage deleted items through the available trash functionality.
 - Restore supported deleted files or folders.
 - Keep deletion and recovery operations subject to backend access checks.
 
-### 🖥️ 9. Modern Web Interface
+### 🖥️ 10. Modern Web Interface
 
 - React-based user interface.
 - Vite-powered frontend development.
@@ -272,6 +284,17 @@ DriveX includes several security-oriented implementation choices:
 - User-scoped file and folder operations.
 - Permission checks for shared resources.
 - Environment variables for sensitive configuration.
+
+### Privacy & safety principles
+
+- **Least privilege:** users should receive only the access granted to them.
+- **Private by default:** sharing should be explicit; do not assume files are public.
+- **Permission revocation:** verify that revoked access no longer works through direct API requests.
+- **Safe error handling:** avoid returning secrets, tokens, internal paths, or sensitive file details in error messages.
+- **Upload safety:** validate uploaded files and prevent unsafe path handling.
+- **Repository hygiene:** exclude `.env` files, authentication cookies, and uploaded user content from Git.
+
+These are implementation and verification goals; do not describe a control as fully enforced until it has been tested against the current backend.
 
 ### Deployment security checklist
 
