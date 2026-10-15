@@ -20,6 +20,7 @@ import {
   Pencil,
   Move,
   RotateCcw,
+  History,
   Trash,
   X,
 } from "lucide-react";
@@ -180,6 +181,10 @@ function DriveApp({ user, onLogout }) {
   const [accessRole, setAccessRole] = useState("viewer");
   const [accessLoading, setAccessLoading] = useState(false);
   const [accessSaving, setAccessSaving] = useState(false);
+  const [versionHistoryTarget, setVersionHistoryTarget] = useState(null);
+  const [versions, setVersions] = useState([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [versionUploading, setVersionUploading] = useState(false);
 
   const { folders, files } = state;
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
@@ -680,6 +685,105 @@ function DriveApp({ user, onLogout }) {
     }
   }
 
+      function formatVersionSize(size) {
+        const bytes = Number(size || 0);
+        return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      }
+
+      async function openVersionHistory(file) {
+        setVersionHistoryTarget(file);
+        setVersions([]);
+        setVersionsLoading(true);
+        try {
+          const response = await fetch(`${API_BASE}/api/files/${encodeURIComponent(file.id)}/versions`, {
+            credentials: "include",
+            headers: { Accept: "application/json" },
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.success || !Array.isArray(payload.versions)) {
+            throw new Error(payload.message || "Unable to load version history.");
+          }
+          setVersions(payload.versions);
+        } catch (versionError) {
+          setVersionHistoryTarget(null);
+          setFailure(versionError.message || "Unable to load version history.");
+        } finally {
+          setVersionsLoading(false);
+        }
+      }
+
+      async function downloadVersion(version) {
+        try {
+          const response = await fetch(`${API_BASE}/api/files/${encodeURIComponent(versionHistoryTarget.id)}/versions/${encodeURIComponent(version.id)}/download`, {
+            credentials: "include",
+          });
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.message || "Unable to download version.");
+          }
+          const url = URL.createObjectURL(await response.blob());
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = version.originalName || versionHistoryTarget.name;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.setTimeout(() => URL.revokeObjectURL(url), 0);
+        } catch (versionError) {
+          setFailure(versionError.message || "Unable to download version.");
+        }
+      }
+
+      async function handleVersionUpload(event) {
+        const file = event.target.files?.[0];
+        if (!file || !versionHistoryTarget) return;
+        const validation = validateFileName(file.name);
+        if (validation) {
+          setFailure(validation);
+          event.target.value = "";
+          return;
+        }
+        setVersionUploading(true);
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          const response = await fetch(`${API_BASE}/api/files/${encodeURIComponent(versionHistoryTarget.id)}/versions`, {
+            method: "POST",
+            credentials: "include",
+            headers: { Accept: "application/json" },
+            body: formData,
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.success) throw new Error(payload.message || "Unable to upload new version.");
+          await openVersionHistory(versionHistoryTarget);
+          await refreshFiles(versionHistoryTarget.parentId);
+          showNotice("New file version uploaded successfully.");
+        } catch (versionError) {
+          setFailure(versionError.message || "Unable to upload new version.");
+        } finally {
+          setVersionUploading(false);
+          event.target.value = "";
+        }
+      }
+
+      async function restoreVersion(version) {
+        if (!version.id || !window.confirm(`Restore version ${version.versionNumber} of "${versionHistoryTarget.name}"?`)) return;
+        try {
+          const response = await fetch(`${API_BASE}/api/files/${encodeURIComponent(versionHistoryTarget.id)}/versions/${encodeURIComponent(version.id)}/restore`, {
+            method: "POST",
+            credentials: "include",
+            headers: { Accept: "application/json" },
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.success) throw new Error(payload.message || "Unable to restore version.");
+          await openVersionHistory(versionHistoryTarget);
+          await refreshFiles(versionHistoryTarget.parentId);
+          showNotice("Version restored successfully.");
+        } catch (versionError) {
+          setFailure(versionError.message || "Unable to restore version.");
+        }
+      }
+
   async function downloadFile(file) {
     try {
       const response = await fetch(`${API_BASE}/api/files/${encodeURIComponent(file.id)}/download`, {
@@ -847,6 +951,7 @@ function DriveApp({ user, onLogout }) {
           ) : (
             <>
               {item.type !== "folder" && <button onClick={() => { setOpenMenu(null); downloadFile(item); }}><Download size={16} /><span>Download</span></button>}
+              {item.type !== "folder" && <button onClick={() => { setOpenMenu(null); openVersionHistory(item); }}><History size={16} /><span>Version history</span></button>}
               {canEdit(item) && <button onClick={() => { setOpenMenu(null); renameItem(item); }}><Pencil size={16} /><span>Rename</span></button>}
               {isOwner(item) && <button onClick={() => { setOpenMenu(null); setMoveTarget(item); }}><Move size={16} /><span>Move</span></button>}
               {isOwner(item) && <button onClick={() => { setOpenMenu(null); toggleStar(item); }}><Star size={16} /> <span>{item.starred ? "Remove from Starred" : "Add to Starred"}</span></button>}
@@ -888,6 +993,7 @@ function DriveApp({ user, onLogout }) {
         </aside>
         <main className="main-content">
           <input id="file-upload" type="file" multiple hidden onChange={handleFileUpload} />
+          <input id="version-upload" type="file" hidden onChange={handleVersionUpload} />
           {(error || notice) && <div className={`error-banner ${notice && !error ? "success-banner" : ""}`} role="status">{error || notice}<button onClick={() => { setError(""); setNotice(""); }} aria-label="Dismiss notification"><X size={16} /></button></div>}
           <div className="page-heading">
             <div><h1>{activePage}</h1><p className="breadcrumb"><button className="breadcrumb-button" onClick={() => { setOpenMenu(null); setCurrentFolder(null); }}>{inShared ? "Shared with me" : "My Drive"}</button>{breadcrumb.map((folder) => <span key={folder.id}> / <button className="breadcrumb-button" onClick={() => { setOpenMenu(null); setCurrentFolder(folder.id); }}>{folder.name}</button></span>)}</p></div>
@@ -912,6 +1018,15 @@ function DriveApp({ user, onLogout }) {
           {isOwner(accessTarget) && <form className="access-form" onSubmit={saveAccess}><input type="email" value={accessEmail} onChange={(event) => setAccessEmail(event.target.value)} placeholder="Registered user's email" disabled={accessSaving} /><select value={accessRole} onChange={(event) => setAccessRole(event.target.value)} disabled={accessSaving}><option value="viewer">Viewer</option><option value="editor">Editor</option></select><button type="submit" disabled={accessSaving}>{accessSaving ? "Saving..." : "Share"}</button></form>}
           <div className="access-list">{accessEntries.map((entry) => <div className="access-entry" key={entry.userId}><div><strong>{entry.email}</strong><span>{entry.role === "owner" ? "Owner" : entry.name || entry.role}</span></div>{entry.role !== "owner" && isOwner(accessTarget) && <div className="access-entry-actions"><select value={entry.role} onChange={(event) => changeAccessRole(entry, event.target.value)}><option value="viewer">Viewer</option><option value="editor">Editor</option></select><button type="button" onClick={() => revokeAccess(entry)}>Revoke</button></div>}</div>)}</div>
         </>}
+      </div></div>}
+      {versionHistoryTarget && <div className="modal-backdrop" role="presentation"><div className="modal version-modal" role="dialog" aria-modal="true" aria-labelledby="versions-title">
+        <div className="modal-header"><h2 id="versions-title">Version history</h2><button className="icon-button" onClick={() => setVersionHistoryTarget(null)} aria-label="Close"><X size={18} /></button></div>
+        <p>Versions of <strong>{versionHistoryTarget.name}</strong></p>
+        {canEdit(versionHistoryTarget) && <button className="version-upload-button" disabled={versionUploading} onClick={() => document.getElementById("version-upload").click()}><Upload size={16} />{versionUploading ? "Uploading..." : "Upload new version"}</button>}
+        {versionsLoading ? <div className="access-loading"><div className="spinner" aria-label="Loading version history" /></div> : <div className="version-list">
+          {versions.map((version) => <div className="version-entry" key={version.id || `current-${version.versionNumber}`}><div><strong>Version {version.versionNumber}{version.isCurrent ? " (current)" : ""}</strong><span>{new Date(version.createdAt).toLocaleString()} · {formatVersionSize(version.size)}</span><span>{version.uploader?.name || version.uploader?.email || "Unknown uploader"}</span></div><div className="version-actions"><button type="button" onClick={() => version.isCurrent ? downloadFile(versionHistoryTarget) : downloadVersion(version)}><Download size={15} />Download</button>{canEdit(versionHistoryTarget) && !version.isCurrent && <button type="button" onClick={() => restoreVersion(version)}><RotateCcw size={15} />Restore</button>}</div></div>)}
+          {!versions.length && <p className="empty-state">No version history found.</p>}
+        </div>}
       </div></div>}
     </div>
   );

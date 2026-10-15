@@ -36,6 +36,11 @@ const fileSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    currentUploaderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     starred: {
       type: Boolean,
       default: false,

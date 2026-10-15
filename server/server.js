@@ -1,6 +1,7 @@
 ﻿const mongoose = require("mongoose");
 const Folder = require("./models/folder");
 const File = require("./models/file");
+const FileVersion = require("./models/fileVersion");
 const User = require("./models/User");
 const { requireAuth } = require("./middleware/auth");
 
@@ -167,10 +168,41 @@ function handleSingleFileUpload(req, res, next) {
   });
 }
 
+function getStoredFileMetadata(file, fileId, versionNumber, uploaderId) {
+  return {
+    fileId,
+    versionNumber,
+    storagePath: file.storagePath,
+    originalName: file.originalName,
+    mimeType: file.mimeType,
+    size: file.size,
+    uploaderId,
+  };
+}
+
+async function getNextVersionNumber(fileId) {
+  const latestVersion = await FileVersion.findOne({ fileId }).sort({ versionNumber: -1 }).select("versionNumber");
+  return (latestVersion?.versionNumber || 0) + 1;
+}
+
+function getVersionResponse(version, uploader) {
+  return {
+    id: version._id.toString(),
+    versionNumber: version.versionNumber,
+    originalName: version.originalName,
+    mimeType: version.mimeType,
+    size: version.size,
+    createdAt: version.createdAt,
+    uploader: uploader ? { id: uploader._id.toString(), name: uploader.name, email: uploader.email } : null,
+  };
+}
+
 async function removeUploadedFile(file) {
   if (!file || !file.path) {
     return;
   }
+
+
 
   try {
     await fs.promises.unlink(file.path);
@@ -804,6 +836,7 @@ app.post("/api/files", handleSingleFileUpload, async (req, res) => {
       storagePath,
       parentId,
       ownerId: parentFolder ? parentFolder.ownerId : req.user._id,
+      currentUploaderId: req.user._id,
     });
 
     res.status(201).json({
@@ -905,6 +938,222 @@ function resolveStoredFilePath(storagePath) {
 
   return candidatePath;
 }
+
+async function listFileVersions(req, res) {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ success: false, message: "File not found" });
+    }
+
+    const file = await findAccessibleItem(File, req.params.id, req.user._id);
+    if (!file) return res.status(404).json({ success: false, message: "File not found" });
+
+    const versions = await FileVersion.find({ fileId: file._id })
+      .sort({ versionNumber: -1 })
+      .populate("uploaderId", "_id name email");
+    const latestVersion = versions[0]?.versionNumber || 0;
+    const currentUploader = await User.findById(file.currentUploaderId || file.ownerId).select("_id name email");
+    const currentVersion = {
+      id: null,
+      versionNumber: latestVersion + 1,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+      size: file.size,
+      createdAt: file.updatedAt || file.createdAt,
+      uploader: currentUploader
+        ? { id: currentUploader._id.toString(), name: currentUploader.name, email: currentUploader.email }
+        : null,
+      isCurrent: true,
+    };
+
+    return res.json({
+      success: true,
+      versions: [
+        currentVersion,
+        ...versions.map((version) => ({
+          ...getVersionResponse(version, version.uploaderId),
+          isCurrent: false,
+        })),
+      ],
+    });
+  } catch (error) {
+    console.error("List file versions error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to load version history" });
+  }
+}
+
+app.get("/api/files/:id/versions", listFileVersions);
+
+app.get("/api/files/:fileId/versions/:versionId/download", async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.fileId) || !mongoose.isValidObjectId(req.params.versionId)) {
+      return res.status(404).json({ success: false, message: "Version not found" });
+    }
+
+    const file = await findAccessibleItem(File, req.params.fileId, req.user._id);
+    if (!file) return res.status(404).json({ success: false, message: "Version not found" });
+    const version = await FileVersion.findOne({ _id: req.params.versionId, fileId: file._id });
+    if (!version) return res.status(404).json({ success: false, message: "Version not found" });
+
+    const storedFilePath = resolveStoredFilePath(version.storagePath);
+    if (!storedFilePath) return res.status(404).json({ success: false, message: "Version not found" });
+    const storageRoot = await fs.promises.realpath(uploadDir);
+    const resolvedFilePath = await fs.promises.realpath(storedFilePath).catch(() => null);
+    const physicalRelativePath = resolvedFilePath ? path.relative(storageRoot, resolvedFilePath) : "";
+    if (
+      !resolvedFilePath ||
+      !physicalRelativePath ||
+      physicalRelativePath === ".." ||
+      physicalRelativePath.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(physicalRelativePath)
+    ) {
+      return res.status(404).json({ success: false, message: "Version not found" });
+    }
+    const stats = await fs.promises.stat(resolvedFilePath);
+    if (!stats.isFile()) return res.status(404).json({ success: false, message: "Version not found" });
+
+    return res.download(resolvedFilePath, version.originalName, (error) => {
+      if (!error) return;
+      console.error("Version download error:", error.message);
+      if (!res.headersSent) res.status(error.code === "ENOENT" ? 404 : 500).json({
+        success: false,
+        message: error.code === "ENOENT" ? "Version not found" : "Failed to download version",
+      });
+    });
+  } catch (error) {
+    console.error("Version download error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to download version" });
+  }
+});
+
+app.post("/api/files/:id/versions", handleSingleFileUpload, async (req, res) => {
+  const uploadedFile = req.file;
+  if (!uploadedFile) return res.status(400).json({ success: false, message: "A file is required" });
+
+  let createdVersion = null;
+  let fileUpdated = false;
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      await removeUploadedFile(uploadedFile);
+      return res.status(404).json({ success: false, message: "File not found" });
+    }
+    const file = await File.findById(req.params.id);
+    if (!file || file.trashed) {
+      await removeUploadedFile(uploadedFile);
+      return res.status(404).json({ success: false, message: "File not found" });
+    }
+    if (!(await requireEditorOrOwner(file, req, res))) {
+      await removeUploadedFile(uploadedFile);
+      return;
+    }
+
+    const originalName = getSafeOriginalName(uploadedFile.originalname);
+    if (!originalName || originalName.length > 255 || /[<>:"/\\|?*]/.test(originalName)) {
+      await removeUploadedFile(uploadedFile);
+      return res.status(400).json({ success: false, message: "Uploaded file name is invalid" });
+    }
+
+    const versionNumber = await getNextVersionNumber(file._id);
+    const previousVersion = await FileVersion.findOne({ fileId: file._id, versionNumber: versionNumber - 1 });
+    if (!previousVersion) {
+      createdVersion = await FileVersion.create({
+        ...getStoredFileMetadata(file, file._id, versionNumber, file.currentUploaderId || file.ownerId),
+      });
+    } else {
+      createdVersion = await FileVersion.create({
+        ...getStoredFileMetadata(file, file._id, versionNumber, req.user._id),
+      });
+    }
+
+    file.originalName = originalName;
+    file.name = originalName;
+    file.mimeType = uploadedFile.mimetype || "application/octet-stream";
+    file.size = uploadedFile.size;
+    file.storagePath = path.relative(__dirname, uploadedFile.path);
+    file.currentUploaderId = req.user._id;
+    await file.save();
+    fileUpdated = true;
+
+    return res.status(201).json({
+      success: true,
+      message: "New file version uploaded",
+      file: await toAccessibleResource(file, req.user._id),
+      version: getVersionResponse(createdVersion, req.user),
+    });
+  } catch (error) {
+    if (!fileUpdated) {
+      if (createdVersion) await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => {});
+      await removeUploadedFile(uploadedFile);
+    }
+    console.error("Create file version error:", error.message);
+    return res.status(mongoose.connection.readyState === 1 ? 500 : 503).json({
+      success: false,
+      message: "Failed to create file version",
+    });
+  }
+});
+
+app.post("/api/files/:fileId/versions/:versionId/restore", async (req, res) => {
+  let copiedPath = null;
+  let createdVersion = null;
+  let fileUpdated = false;
+  try {
+    if (!mongoose.isValidObjectId(req.params.fileId) || !mongoose.isValidObjectId(req.params.versionId)) {
+      return res.status(404).json({ success: false, message: "Version not found" });
+    }
+    const file = await File.findById(req.params.fileId);
+    if (!file || file.trashed) {
+      return res.status(404).json({ success: false, message: "File not found" });
+    }
+    if (!(await requireEditorOrOwner(file, req, res))) return;
+    const selectedVersion = await FileVersion.findOne({ _id: req.params.versionId, fileId: file._id });
+    if (!selectedVersion) return res.status(404).json({ success: false, message: "Version not found" });
+
+    const sourcePath = resolveStoredFilePath(selectedVersion.storagePath);
+    if (!sourcePath) return res.status(404).json({ success: false, message: "Version contents not found" });
+    const storageRoot = await fs.promises.realpath(uploadDir);
+    const resolvedSourcePath = await fs.promises.realpath(sourcePath).catch(() => null);
+    const sourceRelativePath = resolvedSourcePath ? path.relative(storageRoot, resolvedSourcePath) : "";
+    if (
+      !resolvedSourcePath ||
+      !sourceRelativePath ||
+      sourceRelativePath === ".." ||
+      sourceRelativePath.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(sourceRelativePath)
+    ) {
+      return res.status(404).json({ success: false, message: "Version contents not found" });
+    }
+    const uniqueName = `${Date.now()}-${crypto.randomUUID()}${path.extname(getSafeOriginalName(selectedVersion.originalName))}`;
+    copiedPath = path.join(uploadDir, uniqueName);
+    await fs.promises.copyFile(resolvedSourcePath, copiedPath);
+
+    const versionNumber = await getNextVersionNumber(file._id);
+    createdVersion = await FileVersion.create({
+      ...getStoredFileMetadata(file, file._id, versionNumber, file.currentUploaderId || file.ownerId),
+    });
+    file.originalName = selectedVersion.originalName;
+    file.name = selectedVersion.originalName;
+    file.mimeType = selectedVersion.mimeType;
+    file.size = selectedVersion.size;
+    file.storagePath = path.relative(__dirname, copiedPath);
+    file.currentUploaderId = req.user._id;
+    await file.save();
+    fileUpdated = true;
+
+    return res.json({
+      success: true,
+      message: "Version restored successfully",
+      file: await toAccessibleResource(file, req.user._id),
+    });
+  } catch (error) {
+    if (!fileUpdated) {
+      if (createdVersion) await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => {});
+      if (copiedPath) await removeUploadedFile({ path: copiedPath });
+    }
+    console.error("Restore file version error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to restore version" });
+  }
+});
 
 app.get("/api/files/:id/download", async (req, res) => {
   try {
@@ -1323,6 +1572,9 @@ async function permanentlyDeleteDocument(Model, req, res) {
     }
 
     await Model.deleteOne({ _id: item._id, ownerId: req.user._id });
+    if (Model.modelName === "File") {
+      await FileVersion.deleteMany({ fileId: item._id });
+    }
 
     res.json({
       success: true,

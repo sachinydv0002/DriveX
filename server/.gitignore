@@ -3,4 +3,5 @@ node_modules/
 .env
 .env.*
 !.env.example
-uploads/
+server/uploads/
+*.cookies

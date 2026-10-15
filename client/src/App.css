@@ -610,12 +610,89 @@ input:focus-visible {
   min-height: 120px;
 }
 
+.version-upload-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0 16px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #1a73e8;
+  color: #fff;
+  font-size: 13px;
+}
+
+.version-upload-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.version-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.version-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+}
+
+.version-entry > div:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.version-entry strong,
+.version-entry span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.version-entry span {
+  color: #5f6368;
+  font-size: 12px;
+}
+
+.version-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.version-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: #f1f3f4;
+  color: #174ea6;
+  font-size: 12px;
+}
+
 @media (max-width: 600px) {
   .access-form {
     grid-template-columns: 1fr;
   }
 
   .access-entry {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .version-entry {
     align-items: flex-start;
     flex-direction: column;
   }
