@@ -6,6 +6,18 @@ Built with React, Node.js, Express.js, and MongoDB, DriveX focuses on **user-lev
 
 🔗 **GitHub Repository:** [https://github.com/sachinydv0002/DriveX](https://github.com/sachinydv0002/DriveX)
 
+## 🎥 Project Demo
+
+Watch the full DriveX walkthrough on YouTube:
+
+[![DriveX Project Demo](https://img.youtube.com/vi/TJr437VDTIU/maxresdefault.jpg)](https://youtu.be/TJr437VDTIU)
+
+▶️ **[Watch the full demo on YouTube](https://youtu.be/TJr437VDTIU)**
+
+
+https://github.com/user-attachments/assets/ab054b3e-7203-4a8d-aac7-d7dfbebc9542
+
+
 ---
 
 ## ✨ Key Features
