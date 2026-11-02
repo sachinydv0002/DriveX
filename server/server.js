@@ -27,7 +27,7 @@ const S3_BUCKET = process.env.AWS_S3_BUCKET;
 
 function assertS3Configured() {
   if (!process.env.AWS_REGION || !process.env.AWS_ACCESS_KEY_ID ||
-      !process.env.AWS_SECRET_ACCESS_KEY || !S3_BUCKET) {
+    !process.env.AWS_SECRET_ACCESS_KEY || !S3_BUCKET) {
     throw new Error("AWS S3 is not configured. Check AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_S3_BUCKET.");
   }
 }
@@ -128,8 +128,8 @@ function parseExpiry(value) {
 function buildCookieOptions() {
   return {
     httpOnly: true,
-    sameSite: "lax",
-    secure: isProduction,
+    sameSite: "none",
+    secure: true,
     maxAge: parseExpiry(process.env.JWT_EXPIRES_IN || "7d"),
   };
 }
@@ -461,9 +461,9 @@ app.post("/api/auth/login", async (req, res) => {
 
 app.post("/api/auth/logout", (req, res) => {
   res.clearCookie("token", {
+    sameSite: "none",
+    secure: true,
     httpOnly: true,
-    sameSite: "lax",
-    secure: isProduction,
   });
 
   return res.json({
@@ -1101,7 +1101,7 @@ app.get("/api/files/:fileId/versions/:versionId/download", async (req, res) => {
     const resolvedFilePath = await fs.promises.realpath(storedFilePath).catch(() => null);
     const physicalRelativePath = resolvedFilePath ? path.relative(storageRoot, resolvedFilePath) : "";
     if (!resolvedFilePath || !physicalRelativePath || physicalRelativePath === ".." ||
-        physicalRelativePath.startsWith(`..${path.sep}`) || path.isAbsolute(physicalRelativePath)) {
+      physicalRelativePath.startsWith(`..${path.sep}`) || path.isAbsolute(physicalRelativePath)) {
       return res.status(404).json({ success: false, message: "Version not found" });
     }
     const stats = await fs.promises.stat(resolvedFilePath);
@@ -1176,8 +1176,8 @@ app.post("/api/files/:id/versions", handleSingleFileUpload, async (req, res) => 
     });
   } catch (error) {
     if (!fileUpdated) {
-      if (createdVersion) await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => {});
-      if (newS3Key) await deleteS3Object(newS3Key).catch(() => {});
+      if (createdVersion) await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => { });
+      if (newS3Key) await deleteS3Object(newS3Key).catch(() => { });
       await removeUploadedFile(uploadedFile);
     }
     console.error("Create file version error:", error.message);
@@ -1214,15 +1214,15 @@ app.post("/api/files/:fileId/versions/:versionId/restore", async (req, res) => {
     } else {
       const sourcePath = resolveStoredFilePath(selectedVersion.storagePath);
       if (!sourcePath) {
-        await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => {});
+        await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => { });
         return res.status(404).json({ success: false, message: "Version contents not found" });
       }
       const storageRoot = await fs.promises.realpath(uploadDir);
       const resolvedSourcePath = await fs.promises.realpath(sourcePath).catch(() => null);
       const sourceRelativePath = resolvedSourcePath ? path.relative(storageRoot, resolvedSourcePath) : "";
       if (!resolvedSourcePath || !sourceRelativePath || sourceRelativePath === ".." ||
-          sourceRelativePath.startsWith(`..${path.sep}`) || path.isAbsolute(sourceRelativePath)) {
-        await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => {});
+        sourceRelativePath.startsWith(`..${path.sep}`) || path.isAbsolute(sourceRelativePath)) {
+        await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => { });
         return res.status(404).json({ success: false, message: "Version contents not found" });
       }
       await putLocalFileToS3(resolvedSourcePath, newS3Key, selectedVersion.mimeType);
@@ -1245,8 +1245,8 @@ app.post("/api/files/:fileId/versions/:versionId/restore", async (req, res) => {
     });
   } catch (error) {
     if (!fileUpdated) {
-      if (createdVersion) await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => {});
-      if (newS3Key) await deleteS3Object(newS3Key).catch(() => {});
+      if (createdVersion) await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => { });
+      if (newS3Key) await deleteS3Object(newS3Key).catch(() => { });
     }
     console.error("Restore file version error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to restore version" });
@@ -1726,4 +1726,4 @@ async function startServer() {
   }
 }
 
-startServer();
+startServer()
