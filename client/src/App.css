@@ -1030,9 +1030,13 @@ input:focus-visible {
 }
 
 .action-dropdown {
-  position: absolute;
-  top: 40px;
-  right: 0;
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  right: auto;
+  transform: none;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
   width: 178px;
   padding: 6px;
   background: #fff;
@@ -1507,3 +1511,26 @@ input:focus-visible {
   }
   .drive-loading-state { min-height: min(54vh, 430px); padding-bottom: 50px; }
 }
+
+/* Success and error feedback for completed DriveX actions. */
+.error-banner.success-banner {
+  border-color: #a8dab5;
+  background: #e6f4ea;
+  color: #137333;
+}
+.error-banner.failure-banner {
+  border-color: #f6aea8;
+  background: #fce8e6;
+  color: #b3261e;
+}
+
+/* Keep logout inside the profile menu, as requested. */
+.topbar-actions > .desktop-logout-button { display: none; }
+
+/* Details dialog */
+.details-content { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; }
+.details-icon { display: flex; justify-content: center; color: #4285f4; padding: 8px 0; }
+.details-name { text-align: center; overflow-wrap: anywhere; }
+.details-row { display: flex; justify-content: space-between; gap: 18px; border-top: 1px solid #edf0f4; padding-top: 10px; font-size: 13px; }
+.details-row span:first-child { color: #687078; }
+.details-row span:last-child { text-align: right; overflow-wrap: anywhere; }

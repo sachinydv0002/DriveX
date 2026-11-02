@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Menu,
   Search,
@@ -22,6 +22,7 @@ import {
   RotateCcw,
   History,
   Trash,
+  Info,
   X,
 } from "lucide-react";
 import "./App.css";
@@ -170,13 +171,15 @@ function DriveApp({ user, onLogout }) {
   const [search, setSearch] = useState("");
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
-  const [view, setView] = useState("list");
+  const [view, setView] = useState("grid");
   const [moveTarget, setMoveTarget] = useState(null);
+  const [detailsTarget, setDetailsTarget] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [uploading, setUploading] = useState(false);
   const [foldersLoading, setFoldersLoading] = useState(true);
   const [openMenu, setOpenMenu] = useState(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 8, left: 8 });
   const [accessTarget, setAccessTarget] = useState(null);
   const [accessEntries, setAccessEntries] = useState([]);
   const [accessEmail, setAccessEmail] = useState("");
@@ -187,6 +190,8 @@ function DriveApp({ user, onLogout }) {
   const [versions, setVersions] = useState([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [versionUploading, setVersionUploading] = useState(false);
+  const skipNextHistorySync = useRef(false);
+  const noticeTimer = useRef(null);
 
   const { folders, files } = state;
   const folderById = useMemo(() => new Map(folders.map((folder) => [folder.id, folder])), [folders]);
@@ -200,58 +205,39 @@ function DriveApp({ user, onLogout }) {
       try {
         setState({ folders: [], files: [] });
         setCurrentFolder(null);
-        const response = await fetch(`${API_BASE}/api/folders?includeTrashed=true`, {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || !payload.success || !Array.isArray(payload.folders)) {
+        // Fetch the four collections concurrently instead of waiting for each request in turn.
+        const requests = await Promise.all([
+          fetch(`${API_BASE}/api/folders?includeTrashed=true`, { method: "GET", credentials: "include", headers: { Accept: "application/json" } }),
+          fetch(`${API_BASE}/api/folders?view=shared&all=true`, { method: "GET", credentials: "include", headers: { Accept: "application/json" } }),
+          fetch(`${API_BASE}/api/files?includeTrashed=true`, { method: "GET", credentials: "include", headers: { Accept: "application/json" } }),
+          fetch(`${API_BASE}/api/files?view=shared&all=true`, { method: "GET", credentials: "include", headers: { Accept: "application/json" } }),
+        ]);
+        const [payload, sharedFoldersPayload, filesPayload, sharedFilesPayload] = await Promise.all(
+          requests.map((response) => response.json().catch(() => ({})))
+        );
+        const [foldersResponse, sharedFoldersResponse, filesResponse, sharedFilesResponse] = requests;
+        if (!foldersResponse.ok || !payload.success || !Array.isArray(payload.folders)) {
           throw new Error(payload.message || "Unable to refresh folders");
         }
-
-        const folders = payload.folders.map((folder) => ({
-        id: String(folder._id || ""),
-        name: folder.name,
-        parentId: folder.parentId ? String(folder.parentId) : null,
-        kind: "folder",
-        createdAt: folder.createdAt,
-        updated: folder.updatedAt ? new Date(folder.updatedAt).toLocaleDateString() : "Just now",
-        starred: Boolean(folder.starred),
-        trashed: Boolean(folder.trashed),
-        ownerId: String(folder.ownerId || ""),
-        sharedWith: folder.sharedWith || [],
-        accessRole: folder.accessRole || null,
-        sharedRoot: Boolean(folder.sharedRoot),
-        canTrash: Boolean(folder.canTrash),
-        })).filter((folder) => isMongoId(folder.id));
-        const sharedFoldersResponse = await fetch(`${API_BASE}/api/folders?view=shared&all=true`, {
-          method: "GET",
-          credentials: "include",
-          headers: { Accept: "application/json" },
-        });
-        const sharedFoldersPayload = await sharedFoldersResponse.json().catch(() => ({}));
         if (!sharedFoldersResponse.ok || !sharedFoldersPayload.success || !Array.isArray(sharedFoldersPayload.folders)) {
           throw new Error(sharedFoldersPayload.message || "Unable to refresh shared folders");
         }
-        const filesResponse = await fetch(`${API_BASE}/api/files?includeTrashed=true`, {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-        });
-        const filesPayload = await filesResponse.json().catch(() => ({}));
         if (!filesResponse.ok || !filesPayload.success || !Array.isArray(filesPayload.files)) {
           throw new Error(filesPayload.message || "Unable to refresh files");
         }
-        const sharedFilesResponse = await fetch(`${API_BASE}/api/files?view=shared&all=true`, {
-          method: "GET",
-          credentials: "include",
-          headers: { Accept: "application/json" },
-        });
-        const sharedFilesPayload = await sharedFilesResponse.json().catch(() => ({}));
         if (!sharedFilesResponse.ok || !sharedFilesPayload.success || !Array.isArray(sharedFilesPayload.files)) {
           throw new Error(sharedFilesPayload.message || "Unable to refresh shared files");
         }
+        const folders = payload.folders.map((folder) => ({
+          id: String(folder._id || ""), name: folder.name,
+          parentId: folder.parentId ? String(folder.parentId) : null,
+          kind: "folder", createdAt: folder.createdAt,
+          updated: folder.updatedAt ? new Date(folder.updatedAt).toLocaleDateString() : "Just now",
+          starred: Boolean(folder.starred), trashed: Boolean(folder.trashed),
+          ownerId: String(folder.ownerId || ""), sharedWith: folder.sharedWith || [],
+          accessRole: folder.accessRole || null, sharedRoot: Boolean(folder.sharedRoot),
+          canTrash: Boolean(folder.canTrash),
+        })).filter((folder) => isMongoId(folder.id));
 
         if (!active) return;
         const sharedFolders = sharedFoldersPayload.folders.map((folder) => ({
@@ -291,30 +277,82 @@ function DriveApp({ user, onLogout }) {
   }, [user.id]);
 
   useEffect(() => {
-    function closeMenu(event) {
+    function closeMenus(event) {
       if (!event.target.closest(".action-menu")) setOpenMenu(null);
+      if (!event.target.closest(".topbar-actions")) setProfileMenuOpen(false);
+      if (!event.target.closest(".mobile-quick-actions")) setQuickActionsOpen(false);
     }
     function closeMenuOnEscape(event) {
-      if (event.key === "Escape") setOpenMenu(null);
+      if (event.key === "Escape") {
+        setOpenMenu(null);
+        setProfileMenuOpen(false);
+        setQuickActionsOpen(false);
+      }
     }
-    document.addEventListener("mousedown", closeMenu);
+    document.addEventListener("mousedown", closeMenus);
     document.addEventListener("keydown", closeMenuOnEscape);
     return () => {
-      document.removeEventListener("mousedown", closeMenu);
+      document.removeEventListener("mousedown", closeMenus);
       document.removeEventListener("keydown", closeMenuOnEscape);
     };
   }, []);
 
+  useEffect(() => {
+    const currentState = { drivex: true, folderId: currentFolder, page: activePage };
+    if (skipNextHistorySync.current) {
+      skipNextHistorySync.current = false;
+      return;
+    }
+    // Page tabs replace the current state; only folder navigation creates Back history.
+    window.history.replaceState(currentState, "", window.location.href);
+  }, [currentFolder, activePage]);
+
+  useEffect(() => {
+    function restoreDriveLocation(event) {
+      if (!event.state?.drivex) {
+        window.history.replaceState({ drivex: true, folderId: null, page: activePage }, "", window.location.href);
+        setCurrentFolder(null);
+        return;
+      }
+      skipNextHistorySync.current = true;
+      setCurrentFolder(event.state.folderId || null);
+      setActivePage(event.state.page || "My Drive");
+      setOpenMenu(null);
+      setProfileMenuOpen(false);
+      setQuickActionsOpen(false);
+      setSearch("");
+    }
+    window.addEventListener("popstate", restoreDriveLocation);
+    return () => window.removeEventListener("popstate", restoreDriveLocation);
+  }, []);
+
+  useEffect(() => () => {
+    if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
+  }, []);
+
   function setFailure(message) {
+    if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
     setError(message);
     setNotice("");
-    window.setTimeout(() => setError(""), 3500);
+    noticeTimer.current = window.setTimeout(() => setError(""), 3500);
   }
 
   function showNotice(message) {
+    if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
     setError("");
     setNotice(message);
-    window.setTimeout(() => setNotice(""), 3500);
+    noticeTimer.current = window.setTimeout(() => setNotice(""), 3500);
+  }
+
+  function navigateFolder(folderId) {
+    setOpenMenu(null);
+    setProfileMenuOpen(false);
+    setQuickActionsOpen(false);
+    const targetPage = (activePage === "Recent" || activePage === "Starred") && folderId ? "My Drive" : activePage;
+    window.history.pushState({ drivex: true, folderId: folderId || null, page: targetPage }, "", window.location.href);
+    skipNextHistorySync.current = true;
+    setActivePage(targetPage);
+    setCurrentFolder(folderId || null);
   }
 
   function formatFile(file) {
@@ -460,44 +498,35 @@ function DriveApp({ user, onLogout }) {
     setUploading(true);
     setError("");
     setNotice(`Uploading ${uploadedFiles.length} file${uploadedFiles.length === 1 ? "" : "s"}...`);
-    let uploadedCount = 0;
     try {
-      if (foldersLoading) {
-        throw new Error("Refreshing the folder list. Please try uploading again in a moment.");
-      }
-
-      for (const file of uploadedFiles) {
-      const validation = validateFileName(file.name);
-        if (validation) {
-          throw new Error(`${file.name}: ${validation}`);
-        }
-
-        const formData = new FormData();
-        formData.append("file", file);
+      if (foldersLoading) throw new Error("Drive is still loading. Please try uploading again in a moment.");
+      const invalidFile = uploadedFiles.find((file) => validateFileName(file.name));
+      if (invalidFile) throw new Error(`${invalidFile.name}: ${validateFileName(invalidFile.name)}`);
       if (currentFolder && !getApiParentId()) {
         throw new Error("This folder is not available on the server yet. Refresh the folder list before uploading here.");
       }
-      const apiParentId = getApiParentId();
-      if (apiParentId) {
-        formData.append("parentId", apiParentId);
-      }
 
+      const apiParentId = getApiParentId();
+      // Upload selected files concurrently rather than waiting for each upload to finish.
+      const results = await Promise.all(uploadedFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (apiParentId) formData.append("parentId", apiParentId);
         const response = await fetch(`${API_BASE}/api/files`, {
-          method: "POST",
-          credentials: "include",
-          headers: { Accept: "application/json" },
-          body: formData,
+          method: "POST", credentials: "include",
+          headers: { Accept: "application/json" }, body: formData,
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload.success || !payload.file) {
           const statusMessage = response.status ? ` (HTTP ${response.status})` : "";
           throw new Error(payload.message ? `${payload.message}${statusMessage}` : `Unable to upload ${file.name}${statusMessage}`);
         }
-        uploadedCount += 1;
-      }
+        return formatFile(payload.file);
+      }));
 
-      await refreshFiles(getApiParentId());
-      showNotice(`${uploadedCount} file${uploadedCount === 1 ? "" : "s"} uploaded successfully.`);
+      // Show successful uploads immediately; avoid a second full-list fetch after the upload.
+      setState((current) => ({ ...current, files: dedupeResources([...current.files, ...results.filter(Boolean)]) }));
+      showNotice(`${results.length} file${results.length === 1 ? "" : "s"} uploaded successfully.`);
     } catch (uploadError) {
       setFailure(uploadError.message || "File upload failed.");
     } finally {
@@ -600,6 +629,7 @@ function DriveApp({ user, onLogout }) {
     if (validation) return setFailure(validation);
     try {
       mergeUpdatedItem(item, await updateItem(item, "rename", { name }));
+      showNotice("Renamed successfully.");
     } catch (renameError) {
       setFailure(renameError.message || "Unable to rename item.");
     }
@@ -610,6 +640,7 @@ function DriveApp({ user, onLogout }) {
     try {
       mergeUpdatedItem(item, await updateItem(item, "trash"));
       if (item.id === currentFolder) setCurrentFolder(null);
+      showNotice("Moved to Trash successfully.");
     } catch (trashError) {
       setFailure(trashError.message || "Unable to move item to Trash.");
     }
@@ -618,6 +649,7 @@ function DriveApp({ user, onLogout }) {
   async function restoreItem(item) {
     try {
       mergeUpdatedItem(item, await updateItem(item, "restore"));
+      showNotice("Restored successfully.");
     } catch (restoreError) {
       setFailure(restoreError.message || "Unable to restore item.");
     }
@@ -637,6 +669,7 @@ function DriveApp({ user, onLogout }) {
         ...current,
         [item.type === "folder" ? "folders" : "files"]: current[item.type === "folder" ? "folders" : "files"].filter((value) => value.id !== item.id),
       }));
+      showNotice("Deleted permanently.");
     } catch (deleteError) {
       setFailure(deleteError.message || "Unable to permanently delete item.");
     }
@@ -671,6 +704,7 @@ function DriveApp({ user, onLogout }) {
         folders: current.folders.filter((folder) => !folder.trashed),
         files: current.files.filter((file) => !file.trashed),
       }));
+      showNotice("Trash emptied successfully.");
     }).catch((trashError) => setFailure(trashError.message || "Unable to empty Trash."));
   }
 
@@ -682,6 +716,7 @@ function DriveApp({ user, onLogout }) {
     try {
       mergeUpdatedItem(item, await updateItem(item, "move", { parentId: destinationId }));
       setMoveTarget(null);
+      showNotice("Moved successfully.");
     } catch (moveError) {
       setFailure(moveError.message || "Unable to move item.");
     }
@@ -943,8 +978,18 @@ function DriveApp({ user, onLogout }) {
   function renderMenu(item) {
     return (
       <details className="action-menu" open={openMenu === item.id}>
-        <summary className="icon-button menu-trigger" title="More actions" aria-label={`More actions for ${item.name}`} onClick={(event) => { event.preventDefault(); setOpenMenu((current) => current === item.id ? null : item.id); }}><MoreVertical size={19} /></summary>
-        <div className="action-dropdown">
+        <summary className="icon-button menu-trigger" title="More actions" aria-label={`More actions for ${item.name}`} onClick={(event) => {
+          event.preventDefault();
+          if (openMenu === item.id) { setOpenMenu(null); return; }
+          const rect = event.currentTarget.getBoundingClientRect();
+          const menuWidth = 190;
+          const estimatedMenuHeight = 330;
+          const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
+          const top = Math.max(8, Math.min(rect.top, window.innerHeight - estimatedMenuHeight - 8));
+          setMenuPosition({ top, left });
+          setOpenMenu(item.id);
+        }}><MoreVertical size={19} /></summary>
+        <div className="action-dropdown" style={openMenu === item.id ? { top: menuPosition.top, left: menuPosition.left } : undefined}>
           {inTrash ? (
             <>
               {canEdit(item) && <button onClick={() => { setOpenMenu(null); restoreItem(item); }}><RotateCcw size={16} /><span>Restore</span></button>}
@@ -952,6 +997,7 @@ function DriveApp({ user, onLogout }) {
             </>
           ) : (
             <>
+              <button onClick={() => { setOpenMenu(null); setDetailsTarget(item); }}><Info size={16} /><span>Details</span></button>
               {item.type !== "folder" && <button onClick={() => { setOpenMenu(null); downloadFile(item); }}><Download size={16} /><span>Download</span></button>}
               {item.type !== "folder" && <button onClick={() => { setOpenMenu(null); openVersionHistory(item); }}><History size={16} /><span>Version history</span></button>}
               {canEdit(item) && <button onClick={() => { setOpenMenu(null); renameItem(item); }}><Pencil size={16} /><span>Rename</span></button>}
@@ -1010,6 +1056,9 @@ function DriveApp({ user, onLogout }) {
               setOpenMenu(null);
               setActivePage(label);
               setCurrentFolder(null);
+              window.history.replaceState({ drivex: true, folderId: null, page: label }, "", window.location.href);
+              setProfileMenuOpen(false);
+              setQuickActionsOpen(false);
               setSearch("");
             }}><Icon size={19} /><span>{label}</span></button>)}
           </nav>
@@ -1018,9 +1067,9 @@ function DriveApp({ user, onLogout }) {
         <main className={`main-content ${foldersLoading || (visibleFolders.length === 0 && visibleFiles.length === 0) ? "drive-is-empty" : ""} ${foldersLoading ? "drive-is-loading" : ""}`}>
           <input id="file-upload" type="file" multiple hidden onChange={handleFileUpload} />
           <input id="version-upload" type="file" hidden onChange={handleVersionUpload} />
-          {(error || notice) && <div className={`error-banner ${notice && !error ? "success-banner" : ""}`} role="status">{error || notice}<button onClick={() => { setError(""); setNotice(""); }} aria-label="Dismiss notification"><X size={16} /></button></div>}
+          {(error || notice) && <div className={`error-banner ${notice && !error ? "success-banner" : "failure-banner"}`} role={error ? "alert" : "status"}>{error || notice}<button onClick={() => { setError(""); setNotice(""); }} aria-label="Dismiss notification"><X size={16} /></button></div>}
           <div className="page-heading">
-            <div><h1>{activePage}</h1><p className="breadcrumb"><button className="breadcrumb-button" onClick={() => { setOpenMenu(null); setCurrentFolder(null); }}>{inShared ? "Shared with me" : "My Drive"}</button>{breadcrumb.map((folder) => <span key={folder.id}> / <button className="breadcrumb-button" onClick={() => { setOpenMenu(null); setCurrentFolder(folder.id); }}>{folder.name}</button></span>)}</p></div>
+            <div><h1>{activePage}</h1><p className="breadcrumb"><button className="breadcrumb-button" onClick={() => { navigateFolder(null); }}>{inShared ? "Shared with me" : "My Drive"}</button>{breadcrumb.map((folder) => <span key={folder.id}> / <button className="breadcrumb-button" onClick={() => { navigateFolder(folder.id); }}>{folder.name}</button></span>)}</p></div>
             <div className="view-toggle"><button className={view === "list" ? "selected" : ""} aria-label="List view" onClick={() => setView("list")}><List size={19} /></button><button className={view === "grid" ? "selected" : ""} aria-label="Grid view" onClick={() => setView("grid")}><Grid2X2 size={18} /></button></div>
           </div>
           {inTrash && <div className="trash-toolbar"><span>Items in Trash are stored in your Drive account.</span><button onClick={emptyTrash}>Empty Trash</button></div>}
@@ -1030,7 +1079,7 @@ function DriveApp({ user, onLogout }) {
               <p>{search ? "Try another search or clear your search." : inTrash ? "Items you move to Trash will appear here." : activePage === "Starred" ? "Star important files and folders to find them here." : activePage === "Recent" ? "Files you open or upload will show up here." : activePage === "Shared with me" ? "Files and folders shared with you will appear here." : "Create a folder or upload a file to get started."}</p>
             </div>}
               {visibleFolders.length > 0 && <section className="section folders-section"><h2>Folders</h2><div className={`folder-grid ${view === "list" ? "folder-list" : "explorer-grid"}`}>
-                {visibleFolders.map((folder) => <div className="folder-card" key={folder.id} onDoubleClick={() => { if (!inTrash) { setOpenMenu(null); setCurrentFolder(folder.id); } }}><Folder className="explorer-folder-icon" size={view === "grid" ? 38 : 21} fill="#8ab4f8" color="#6489c8" /><button className="folder-name folder-open" onClick={() => { if (!inTrash) { setOpenMenu(null); setCurrentFolder(folder.id); } }}>{folder.name}</button>{renderMenu({ ...folder, type: "folder" })}</div>)}
+                {visibleFolders.map((folder) => <div className="folder-card" key={folder.id} onDoubleClick={() => { if (!inTrash) { navigateFolder(folder.id); } }}><Folder className="explorer-folder-icon" size={view === "grid" ? 38 : 21} fill="#8ab4f8" color="#6489c8" /><button className="folder-name folder-open" onClick={() => { if (!inTrash) { navigateFolder(folder.id); } }}>{folder.name}</button>{renderMenu({ ...folder, type: "folder" })}</div>)}
               </div></section>}
               {visibleFiles.length > 0 && <section className="section files-section"><h2>Files</h2>{view === "grid" ? <div className="file-grid">
                 {visibleFiles.map((file) => { const FileIcon = file.type === "image" ? Image : FileText; return <div className="file-grid-card" key={file.id}><button className="file-grid-open" title={file.name} onClick={() => downloadFile(file)}><FileIcon size={42} strokeWidth={1.5} color={file.type === "image" ? "#3984e8" : "#6b83a6"} /><span>{file.name}</span></button><div className="file-grid-menu">{renderMenu(file)}</div></div>; })}
@@ -1039,6 +1088,7 @@ function DriveApp({ user, onLogout }) {
               </div>}</section>}
         </main>
       </div>
+      {detailsTarget && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailsTarget(null); }}><div className="modal details-modal" role="dialog" aria-modal="true" aria-labelledby="details-title"><div className="modal-header"><h2 id="details-title">Details</h2><button className="icon-button" onClick={() => setDetailsTarget(null)} aria-label="Close"><X size={18} /></button></div><div className="details-content"><div className="details-icon">{detailsTarget.type === "folder" ? <Folder size={34} /> : detailsTarget.type === "image" ? <Image size={34} /> : <FileText size={34} />}</div><strong className="details-name">{detailsTarget.name}</strong><div className="details-row"><span>Type</span><span>{detailsTarget.type === "folder" ? "Folder" : detailsTarget.type === "image" ? "Image" : "File"}</span></div><div className="details-row"><span>Location</span><span>{itemLocation(detailsTarget.parentId)}</span></div><div className="details-row"><span>Last modified</span><span>{detailsTarget.updated || "—"}</span></div>{detailsTarget.size != null && <div className="details-row"><span>Size</span><span>{detailsTarget.size}</span></div>}</div></div></div>}
       {moveTarget && <div className="modal-backdrop" role="presentation"><div className="modal" role="dialog" aria-modal="true" aria-labelledby="move-title"><div className="modal-header"><h2 id="move-title">Move “{moveTarget.name}”</h2><button className="icon-button" onClick={() => setMoveTarget(null)} aria-label="Close"><X size={18} /></button></div><p>Select a destination folder.</p><div className="destination-list"><button onClick={() => moveItem(moveTarget, null)}><Folder size={18} />My Drive</button>{liveFolders.filter((folder) => folder.id !== moveTarget.id && isOwner(folder) && !(moveTarget.type === "folder" && getDescendantIds(moveTarget.id).has(folder.id))).map((folder) => <button key={folder.id} onClick={() => moveItem(moveTarget, folder.id)}><Folder size={18} />{itemLocation(folder.parentId)} / {folder.name}</button>)}</div></div></div>}
       {accessTarget && <div className="modal-backdrop" role="presentation"><div className="modal access-modal" role="dialog" aria-modal="true" aria-labelledby="access-title">
         <div className="modal-header"><h2 id="access-title">Manage access</h2><button className="icon-button" onClick={() => setAccessTarget(null)} aria-label="Close"><X size={18} /></button></div>
