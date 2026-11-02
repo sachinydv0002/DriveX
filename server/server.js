@@ -1587,6 +1587,33 @@ async function trashDocument(Model, req, res) {
     item.trashed = true;
     await item.save();
 
+    // Keep all descendants out of Recent/My Drive when a folder is trashed.
+    if (Model.modelName === "Folder") {
+      const pendingFolderIds = [item._id];
+      const descendantFolderIds = [];
+      while (pendingFolderIds.length) {
+        const children = await Folder.find({
+          ownerId: req.user._id,
+          parentId: { $in: pendingFolderIds },
+        }).select("_id");
+        pendingFolderIds.length = 0;
+        for (const child of children) {
+          descendantFolderIds.push(child._id);
+          pendingFolderIds.push(child._id);
+        }
+      }
+      if (descendantFolderIds.length) {
+        await Folder.updateMany(
+          { _id: { $in: descendantFolderIds }, ownerId: req.user._id },
+          { $set: { trashed: true } }
+        );
+      }
+      await File.updateMany(
+        { ownerId: req.user._id, parentId: { $in: [item._id, ...descendantFolderIds] } },
+        { $set: { trashed: true } }
+      );
+    }
+
     res.json({
       success: true,
       message: "Item moved to Trash",
@@ -1677,12 +1704,42 @@ async function permanentlyDeleteDocument(Model, req, res) {
     if (Model.modelName === "File") {
       const versions = await FileVersion.find({ fileId: item._id }).select("s3Key");
       const keys = [...new Set([item.s3Key, ...versions.map((version) => version.s3Key)].filter(Boolean))];
-      for (const key of keys) {
-        await deleteS3Object(key);
-      }
+      for (const key of keys) await deleteS3Object(key);
       await FileVersion.deleteMany({ fileId: item._id });
+      await File.deleteOne({ _id: item._id, ownerId: req.user._id });
+    } else {
+      // Permanently deleting a folder must also delete nested folders/files,
+      // otherwise orphaned files can reappear in Recent.
+      const pendingFolderIds = [item._id];
+      const descendantFolderIds = [];
+      while (pendingFolderIds.length) {
+        const children = await Folder.find({
+          ownerId: req.user._id,
+          parentId: { $in: pendingFolderIds },
+        }).select("_id");
+        pendingFolderIds.length = 0;
+        for (const child of children) {
+          descendantFolderIds.push(child._id);
+          pendingFolderIds.push(child._id);
+        }
+      }
+      const folderIds = [item._id, ...descendantFolderIds];
+      const descendantFiles = await File.find({
+        ownerId: req.user._id,
+        parentId: { $in: folderIds },
+      }).select("_id s3Key");
+      for (const file of descendantFiles) {
+        const versions = await FileVersion.find({ fileId: file._id }).select("s3Key");
+        const keys = [...new Set([file.s3Key, ...versions.map((version) => version.s3Key)].filter(Boolean))];
+        for (const key of keys) await deleteS3Object(key);
+        await FileVersion.deleteMany({ fileId: file._id });
+      }
+      const descendantFileIds = descendantFiles.map((file) => file._id);
+      if (descendantFileIds.length) {
+        await File.deleteMany({ _id: { $in: descendantFileIds }, ownerId: req.user._id });
+      }
+      await Folder.deleteMany({ _id: { $in: folderIds }, ownerId: req.user._id });
     }
-    await Model.deleteOne({ _id: item._id, ownerId: req.user._id });
 
     res.json({
       success: true,
