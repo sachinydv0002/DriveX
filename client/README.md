@@ -1,230 +1,193 @@
-# 💻 DriveX Client — React Frontend
+<div align="center">
 
-The frontend application for **DriveX**, a full-stack MERN-based personal cloud file management system inspired by Google Drive.
+# 💻 DriveX Client
 
-Built with **React.js and Vite**, the client provides an interface for authentication, file and folder organization, file sharing, search, and version management through the DriveX backend API.
+### A Modern Interface for Your Cloud Files ☁️
 
-🔗 **Main Repository:** [DriveX](https://github.com/sachinydv0002/DriveX)
+A responsive React frontend for DriveX — a personal cloud file management platform with file organization, secure authentication, sharing, search, and version history.
 
-📂 **Frontend Directory:** [client](https://github.com/sachinydv0002/DriveX/tree/main/client)
+<p>
+  <a href="https://drivex-orcin.vercel.app/"><strong>🚀 Live Demo</strong></a> &nbsp; • &nbsp;
+  <a href="https://github.com/sachinydv0002/DriveX"><strong>📦 Main Repository</strong></a> &nbsp; • &nbsp;
+  <a href="https://youtu.be/TJr437VDTIU"><strong>▶ Project Demo</strong></a>
+</p>
+
+<img src="https://img.shields.io/badge/React-Frontend-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React"/>
+<img src="https://img.shields.io/badge/Vite-Build%20Tool-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite"/>
+<img src="https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" alt="JavaScript"/>
+<img src="https://img.shields.io/badge/CSS3-Styling-1572B6?style=for-the-badge&logo=css3&logoColor=white" alt="CSS3"/>
+
+</div>
 
 ---
 
-## ✨ Frontend Features
+## 🌟 Overview
 
-### 🔐 Authentication Interface
+DriveX Client is the frontend of **DriveX**, a full-stack MERN cloud file management application inspired by modern cloud drives.
 
-- User registration and login screens.
-- Integration with backend authentication.
-- HTTP-only cookie-based session handling through API requests.
-- Access to protected features through the application's authentication flow.
+Built with React.js and Vite, it provides an interactive interface for managing files and folders, controlling sharing permissions, searching content, and accessing file versions.
 
-### 📁 File Management Interface
+The frontend communicates with the DriveX backend API, which handles authentication, authorization, database operations, and file storage.
 
+## ✨ Features
+
+### 🔐 Authentication
+- User registration and login.
+- Backend authentication integration.
+- HTTP-only cookie-based session handling.
+- Credential-aware API requests for protected operations.
+
+### 📁 File & Folder Management
 - Upload and download files.
-- View and organize files and folders.
-- Create nested folders.
+- Create and navigate nested folders.
 - Rename, move, and delete supported items.
-- Handle files with duplicate filenames.
+- Support duplicate filenames.
+- Organize files through the main interface.
 
-### 🤝 Sharing & Access Management
-
+### 🤝 Sharing & Access Control
 - Manage access to shared files and folders.
-- Support Viewer and Editor permission workflows.
-- Allow owners to manage or revoke access through the interface.
-- Display operations according to the application's available permissions.
+- Viewer and Editor permission workflows.
+- Allow owners to manage and revoke access.
+- Connect interface actions to backend authorization.
 
 ### 🕘 File Version History
-
 - View available file versions.
-- Upload a new version of an existing file.
+- Upload new versions.
 - Download previous versions.
-- Restore an earlier version through the available controls.
+- Restore earlier versions through available controls.
 
 ### 🔎 Search & Organization
-
-- Search for files using the available search functionality.
+- Search files using available search functionality.
 - Star and unstar important files and folders.
-- Navigate through nested folder structures.
-- Access file-management controls from the main interface.
+- Navigate folder hierarchies.
+- Access file-management actions from the main interface.
 
-### 🎨 User Interface
+### 🗑️ Trash & Recovery
+- Access available deletion and recovery features.
+- Restore supported files and folders.
+- Reflect backend file-management operations in the interface.
 
+### 📱 Responsive Web Interface
 - React component-based architecture.
 - CSS-based styling.
 - Interactive file and folder controls.
-- Vite-powered local development and production builds.
+- Designed for browser access on desktop and mobile screens.
 
 ---
 
-## 🛠️ Technology Stack
+## 🖥️ Live Preview
 
-| Technology         | Purpose                           |
-| ------------------ | --------------------------------- |
-| React.js           | Component-based user interface    |
-| Vite               | Development server and build tool |
-| JavaScript (ES6+)  | Frontend application logic        |
-| CSS3               | Interface styling                 |
-| Fetch/API requests | Communication with the backend    |
-| HTTP-only Cookies  | Authentication session handling   |
-| npm                | Dependency management             |
+<div align="center">
+
+### Explore DriveX
+
+<a href="https://drivex-orcin.vercel.app/">
+  <img src="https://img.shields.io/badge/OPEN%20DRIVEX-Live%20Application-2563EB?style=for-the-badge&logo=vercel&logoColor=white" alt="Open DriveX"/>
+</a>
+
+<a href="https://youtu.be/TJr437VDTIU">
+  <img src="https://img.shields.io/badge/WATCH%20DEMO-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch demo"/>
+</a>
+
+</div>
 
 ---
 
-## 📂 Frontend Structure
+## 🛠️ Tech Stack
+
+| Technology | Purpose |
+|---|---|
+| React.js | UI components and application interface |
+| Vite | Development server and production build |
+| JavaScript (ES6+) | Frontend application logic |
+| CSS3 | Styling and responsive layouts |
+| Fetch / API requests | Backend communication |
+| HTTP-only Cookies | Authentication session handling |
+| npm | Package and dependency management |
+
+### 🔗 Backend & Storage Integration
+
+The frontend connects to the DriveX backend, which integrates with:
+
+- **Node.js and Express.js** — API endpoints and server-side operations.
+- **MongoDB Atlas** — Application data and file metadata.
+- **Amazon S3** — Cloud file storage.
+
+The frontend does not connect directly to MongoDB or Amazon S3. File operations and access permissions are handled through the backend API.
+
+---
+
+## 🏗️ Architecture
+
+```text
+          👤 User
+             |
+             ▼
+   ┌────────────────────┐
+   │    DriveX Client   │
+   │                    │
+   │    React + Vite    │
+   │    Responsive UI   │
+   └─────────┬──────────┘
+             |
+             │ API Requests
+             │ HTTP-only Cookies
+             ▼
+   ┌────────────────────┐
+   │   Express Backend  │
+   │                    │
+   │ Authentication     │
+   │ File Operations    │
+   │ Sharing & Versions │
+   └────────┬─────┬─────┘
+            |     |
+      ┌─────▼──┐ ┌▼─────────┐
+      │MongoDB │ │ AWS S3   │
+      │ Atlas  │ │ Storage  │
+      └────────┘ └──────────┘
+```
+
+---
+
+## 📂 Project Structure
 
 ```text
 client/
+├── public/
 ├── src/
-│   ├── App.jsx          # Main application interface and logic
-│   └── App.css          # Application styles
-├── public/              # Static assets, if present
-├── index.html           # HTML entry point
-├── package.json         # Dependencies and scripts
-├── package-lock.json    # Locked dependency versions
-├── vite.config.js       # Vite configuration, if present
-└── README.md            # Frontend documentation
+│   ├── App.jsx
+│   └── App.css
+├── index.html
+├── package.json
+├── package-lock.json
+└── README.md
 ```
 
-*This is a simplified structure. Additional configuration files may exist in the repository.*
+*This represents the main frontend structure; additional configuration files may exist in the repository.*
 
 ---
 
-## ⚙️ Getting Started
+## 🔒 Security
 
-### Prerequisites
+- Authentication is handled through the backend.
+- HTTP-only cookies help protect authentication tokens from direct JavaScript access.
+- Protected operations rely on backend authorization.
+- The frontend does not store database credentials or server-side secrets.
+- Cross-origin requests must use appropriate credential, CORS, and cookie settings.
 
-Install:
-
-- [Node.js](https://nodejs.org/)
-- npm
-- A running DriveX backend
-- A configured MongoDB connection for the backend
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/sachiny dv0002/DriveX.git
-cd DriveX
-```
-
-### 2. Install frontend dependencies
-
-```bash
-cd client
-npm install
-```
-
-### 3. Configure the API URL
-
-If the frontend uses `VITE_API_URL`, create a `.env` file inside `client/`:
-
-```env
-VITE_API_URL=http://localhost:5000/api
-```
-
-Use the variable name and URL format expected by the existing frontend code. Avoid duplicating `/api` in the final request URL.
-
-**Important:** Vite exposes variables prefixed with `VITE_` to frontend code. Never put database credentials, JWT secrets, or other private server-side secrets in frontend environment variables.
-
-### 4. Start the development server
-
-```bash
-npm run dev
-```
-
-Open the local URL displayed in the terminal, typically:
-
-```text
-http://localhost:5173
-```
-
-Keep the backend running separately so API requests can be processed.
+**Security boundary:** Hiding a button in the frontend is not sufficient authorization. The backend must validate every protected operation.
 
 ---
 
-## 📜 Available Scripts
+## 🚀 Future Enhancements
 
-The following scripts are commonly configured in a Vite project. Check `client/package.json` for the exact scripts available in this repository.
-
-| Command           | Purpose                              |
-| ----------------- | ------------------------------------ |
-| `npm run dev`     | Start the development server         |
-| `npm run build`   | Build the production frontend        |
-| `npm run preview` | Preview the production build locally |
-| `npm run lint`    | Run lint checks, if configured       |
-
-### Production build
-
-```bash
-npm run build
-```
-
-Vite generates the production build in the `dist/` directory by default.
-
----
-
-## 🔌 Backend Integration
-
-The client communicates with the DriveX Express backend for application data and protected operations.
-
-```text
-React Frontend
-      │
-      │ API requests + credentials
-      ▼
-Express Backend
-      │
-      ├── Authentication & Authorization
-      ├── File and Folder Operations
-      ├── Sharing Permissions
-      └── Version History
-             │
-             ▼
-       MongoDB + File Storage
-```
-
-The backend is responsible for authentication, ownership validation, permissions, database operations, and file handling. The frontend should not be treated as the security boundary.
-
----
-
-## 🔒 Security Notes
-
-- Authentication relies on the backend's configured HTTP-only cookie mechanism.
-- Requests requiring authentication must use the appropriate credential settings.
-- Protected operations must be authorized by the backend.
-- Never commit `.env` files containing secrets.
-- Never expose JWT secrets or database connection strings in frontend code.
-- Configure CORS and cookie settings correctly when frontend and backend run on different origins.
-
----
-
-## 🧪 Frontend Verification Checklist
-
-- [x] Frontend starts successfully with `npm run dev`.
-- [x] Login and registration work with the backend.
-- [x] File upload and download work.
-- [x] Folder creation and navigation work.
-- [x] Search and Star/Unstar work.
-- [x] Viewer and Editor workflows work as intended.
-- [x] Version history, upload, download, and restore work.
-- [x] Production build completes successfully.
-- [x] No private credentials are exposed in frontend files.
-
-Only mark an item complete after verifying it.
-
----
-
-## 🚀 Future Improvements
-
-Possible frontend enhancements include:
-
-- File previews for supported formats.
-- Improved loading states and error messages.
-- More responsive layouts for mobile devices.
-- Accessibility improvements.
-- Dedicated automated UI tests.
-- Enhanced search and filtering controls.
+- 🖼️ Expanded file previews.
+- ⚡ Improved loading states and error handling.
+- 📱 Further mobile usability improvements.
+- ♿ Accessibility enhancements.
+- 🔎 Enhanced search and filtering.
+- 🧪 Automated UI tests.
+- 🔔 Activity and notification interface.
 
 These are potential improvements, not claims that they are already implemented.
 
@@ -232,10 +195,26 @@ These are potential improvements, not claims that they are already implemented.
 
 ## 👨‍💻 Author
 
-**Sachin Kumar**
+<div align="center">
 
-B.Tech — Computer Science and Engineering (IoT)
+### Sachin Kumar
 
-GitHub: [sachinydv0002](https://github.com/sachinydv0002)
+**B.Tech — Computer Science & Engineering (IoT)**
 
-**DriveX Client — A clean interface for managing your digital files.**
+<a href="https://github.com/sachinydv0002">
+  <img src="https://img.shields.io/badge/GitHub-sachinydv0002-181717?style=for-the-badge&logo=github" alt="GitHub"/>
+</a>
+
+<a href="https://sachin-portfolio-navy.vercel.app/">
+  <img src="https://img.shields.io/badge/Portfolio-Visit-0A66C2?style=for-the-badge&logo=vercel" alt="Portfolio"/>
+</a>
+
+<a href="https://github.com/sachinydv0002/DriveX">
+  <img src="https://img.shields.io/badge/Project-DriveX-16A34A?style=for-the-badge&logo=github" alt="DriveX Repository"/>
+</a>
+
+---
+
+**DriveX Client — Your files, organized your way.** ☁️
+
+</div>
