@@ -1,68 +1,79 @@
-# DriveX — Project Notes
+# 🚀 DriveX — Project Notes
 
-## 1. Project Overview
+DriveX is a MERN-stack file management application inspired by Google Drive. It provides secure file organization, sharing, and version management through a web interface.
 
-DriveX is a MERN-stack file management application inspired by Google Drive. It provides authenticated file and folder management with sharing and versioning features.
+**Repository:** [DriveX on GitHub](https://github.com/sachinydv0002/DriveX)
 
-## 2. Implemented Features
+## 📌 Implemented Features
 
-- JWT-based cookie authentication.
-- Protected file and folder APIs.
-- File upload and download.
-- Folder creation and nested folder navigation.
-- File and folder rename and move operations.
-- Trash and restore functionality.
-- File version management.
-- File and folder sharing with Viewer and Editor permissions.
-- Starred items and file search.
-- User-specific resource access control.
+- JWT-based authentication using HTTP-only cookies
+- Protected file and folder APIs
+- File upload and download
+- Nested folders and folder navigation
+- File and folder rename and move operations
+- Trash, restore, and permanent deletion
+- File version management
+- File and folder sharing with Viewer and Editor permissions
+- Starred items and file search
+- User-specific resource access control
 
-## 3. Technology Stack
+## 🛠️ Technology Stack
 
-- React.js
-- Node.js
-- Express.js
-- MongoDB and Mongoose
-- JWT authentication
+| Technology | Purpose |
+|---|---|
+| React.js | Frontend interface |
+| Node.js | JavaScript runtime |
+| Express.js | Backend REST APIs |
+| MongoDB | Database |
+| Mongoose | Database modeling |
+| JWT | Authentication |
 
-## 4. Local Setup
+## 🏗️ Project Structure
 
-1. Clone the repository.
-2. Install dependencies in the client and server directories.
-3. Configure the required environment variables.
-4. Start the backend server.
-5. Start the React frontend.
-6. Open the frontend in a browser.
+```text
+DriveX/
+├── client/          # React frontend
+├── server/          # Express backend
+├── docs/
+│   ├── API.md
+│   ├── ARCHITECTURE.md
+│   └── PROJECT_NOTES.md
+└── README.md
+```
 
-Refer to the root README for the exact commands and environment configuration.
+*The structure is illustrative; verify it against the current repository.*
 
-## 5. Security Considerations
+## 🔐 Security Considerations
 
 - Protected APIs require authentication.
-- Ownership and sharing permissions must be checked on the backend.
+- Ownership and sharing permissions must be enforced by the backend.
 - Secrets and private configuration must not be committed to GitHub.
 - Uploaded files and authentication cookies must not be included in the repository.
+- Unauthorized access attempts should be rejected.
 
-## 6. Known Limitations and Pending Verification
+## ⚠️ Known Limitations and Pending Verification
 
-- Automated backend integration tests need to be added and run.
+- Automated backend integration tests need to be added and executed.
 - Cross-account access and permission edge cases require automated verification.
-- Upload failure handling and storage quota enforcement require verification against the implementation.
-- Shared-folder permissions for descendant files and folders are not inherited automatically.
-- Deployment and a live demo are not documented here.
+- Upload-failure handling and storage quota enforcement require verification.
+- Shared-folder permissions for descendant resources are not automatically inherited, according to the current project notes.
+- Deployment details and a reproducible demo environment need verification.
 
-## 7. Testing
+## 🧪 Testing Status
 
-Manual testing has been performed during development. Automated test coverage should be documented only after the relevant tests have been created and executed successfully.
+Manual testing has been performed during development. Automated test coverage should only be documented after the relevant tests have been created and executed successfully.
 
-## 8. Submission
+## 🗺️ Future Improvements
 
-**Repository:** [https://github.com/sachinydv0002/DriveX](https://github.com/sachinydv0002/DriveX)
+- Automated API and authorization tests
+- Configurable per-user storage quotas
+- Improved upload-failure recovery
+- Search and pagination improvements
+- Deployment documentation and a reproducible demo environment
+- Configurable file-expiration policies
 
-## 9. Future Improvements
+## 🔗 Project Links
 
-- Automated API and authorization tests.
-- Configurable per-user storage quotas.
-- Improved upload failure recovery.
-- Search and pagination improvements.
-- Deployment and a reproducible demo environment.
+- **GitHub Repository:** [sachinydv0002/DriveX](https://github.com/sachinydv0002/DriveX)
+- **API Documentation:** [`docs/API.md`](API.md)
+- **Architecture Documentation:** [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
