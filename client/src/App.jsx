@@ -168,6 +168,8 @@ function DriveApp({ user, onLogout }) {
   const [activePage, setActivePage] = useState("My Drive");
   const [currentFolder, setCurrentFolder] = useState(null);
   const [search, setSearch] = useState("");
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [view, setView] = useState("list");
   const [moveTarget, setMoveTarget] = useState(null);
   const [error, setError] = useState("");
@@ -970,9 +972,24 @@ function DriveApp({ user, onLogout }) {
         <button className="icon-button mobile-menu" aria-label="Menu"><Menu size={21} /></button>
         <a className="brand" href="#" onClick={(event) => event.preventDefault()}><span className="brand-icon"><Cloud size={27} /></span><span>DriveX</span></a>
         <div className="search-box"><Search size={20} /><input type="search" placeholder="Search in DriveX" value={search} onChange={(event) => setSearch(event.target.value)} />{search && <button className="icon-button" aria-label="Clear search" onClick={() => setSearch("")}>×</button>}</div>
-        <div className="topbar-actions">
-          <button className="profile" title={`${user.name || user.email} (${user.email})`} aria-label="Current user profile">{getInitials(user.name, user.email)}</button>
-          <button className="logout-button" onClick={onLogout}>Log out</button>
+        <div className={`topbar-actions ${profileMenuOpen ? "profile-menu-open" : ""}`}>
+          <button
+            className="profile"
+            title={`${user.name || user.email} (${user.email})`}
+            aria-label="Current user profile"
+            aria-expanded={profileMenuOpen}
+            onClick={() => setProfileMenuOpen((open) => !open)}
+          >{getInitials(user.name, user.email)}</button>
+          <button className="logout-button desktop-logout-button" onClick={onLogout}>Log out</button>
+          {profileMenuOpen && (
+            <div className="profile-dropdown">
+              <div className="profile-details">
+                <strong>{user.name || "DriveX user"}</strong>
+                <span>{user.email}</span>
+              </div>
+              <button className="logout-button" onClick={onLogout}>Log out</button>
+            </div>
+          )}
         </div>
       </header>
       <div className="workspace">
@@ -980,6 +997,13 @@ function DriveApp({ user, onLogout }) {
           <div className="sidebar-actions">
             {(activePage === "My Drive" || (currentFolder && canEdit(folderById.get(currentFolder)))) && <button className="new-button" onClick={createFolder}><Plus size={21} /><span>New</span></button>}
             {(activePage === "My Drive" || (activePage === "Shared with me" && currentFolder && canEdit(folderById.get(currentFolder)))) && <button className="new-button upload-button" disabled={uploading} onClick={() => document.getElementById("file-upload").click()}><Upload size={18} /><span>{uploading ? "Uploading..." : "Upload files"}</span></button>}
+            {(activePage === "My Drive" || (activePage === "Shared with me" && currentFolder && canEdit(folderById.get(currentFolder)))) && <div className="mobile-quick-actions">
+              {quickActionsOpen && <div className="quick-actions-menu">
+                <button onClick={() => { setQuickActionsOpen(false); createFolder(); }}><Folder size={18} />New folder</button>
+                <button disabled={uploading} onClick={() => { setQuickActionsOpen(false); document.getElementById("file-upload").click(); }}><Upload size={18} />{uploading ? "Uploading..." : "Upload files"}</button>
+              </div>}
+              <button className="mobile-plus-button" aria-label="Create or upload" aria-expanded={quickActionsOpen} onClick={() => setQuickActionsOpen((open) => !open)}><Plus size={25} /></button>
+            </div>}
           </div>
           <nav className="navigation">
             {navigation.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${activePage === label ? "active" : ""}`} onClick={() => {
@@ -991,7 +1015,7 @@ function DriveApp({ user, onLogout }) {
           </nav>
           <div className="storage"><div className="storage-title"><Cloud size={19} /><span>Storage</span></div><div className="storage-track"><div className="storage-used" /></div><p>0 GB of 15 GB used</p><button className="storage-link" onClick={() => { setOpenMenu(null); showNotice("Manage storage is Coming Soon."); }}>Manage storage</button></div>
         </aside>
-        <main className="main-content">
+        <main className={`main-content ${foldersLoading || (visibleFolders.length === 0 && visibleFiles.length === 0) ? "drive-is-empty" : ""} ${foldersLoading ? "drive-is-loading" : ""}`}>
           <input id="file-upload" type="file" multiple hidden onChange={handleFileUpload} />
           <input id="version-upload" type="file" hidden onChange={handleVersionUpload} />
           {(error || notice) && <div className={`error-banner ${notice && !error ? "success-banner" : ""}`} role="status">{error || notice}<button onClick={() => { setError(""); setNotice(""); }} aria-label="Dismiss notification"><X size={16} /></button></div>}
@@ -1000,14 +1024,19 @@ function DriveApp({ user, onLogout }) {
             <div className="view-toggle"><button className={view === "list" ? "selected" : ""} aria-label="List view" onClick={() => setView("list")}><List size={19} /></button><button className={view === "grid" ? "selected" : ""} aria-label="Grid view" onClick={() => setView("grid")}><Grid2X2 size={18} /></button></div>
           </div>
           {inTrash && <div className="trash-toolbar"><span>Items in Trash are stored in your Drive account.</span><button onClick={emptyTrash}>Empty Trash</button></div>}
-          <section className="section"><h2>Folders</h2><div className={`folder-grid ${view === "list" ? "folder-list" : ""}`}>
-            {visibleFolders.map((folder) => <div className="folder-card" key={folder.id} onDoubleClick={() => { if (!inTrash) { setOpenMenu(null); setCurrentFolder(folder.id); } }}><Folder size={21} fill="#8ab4f8" color="#6489c8" /><button className="folder-name folder-open" onClick={() => { if (!inTrash) { setOpenMenu(null); setCurrentFolder(folder.id); } }}>{folder.name}</button>{renderMenu({ ...folder, type: "folder" })}</div>)}
-            {visibleFolders.length === 0 && <p className="empty-state">{inTrash ? "No folders in Trash." : "No folders found."}</p>}
-          </div></section>
-          <section className="section files-section"><h2>Files</h2><div className="file-table"><div className="file-row file-header"><span>Name</span><span>Location</span><span>Last modified</span><span>File size</span><span /></div>
-            {visibleFiles.map((file) => { const FileIcon = file.type === "image" ? Image : FileText; return <div className="file-row" key={file.id}><div className="file-name" onClick={() => { if (inRecent) downloadFile(file); }}><FileIcon size={20} color={file.type === "image" ? "#3984e8" : "#6b83a6"} /><span>{file.name}</span></div><span className="file-location">{inTrash ? itemLocation(file.originalParentId) : itemLocation(file.parentId)}</span><span className="file-updated">{file.updated}</span><span className="file-size">{file.size}</span><div className="file-actions">{renderMenu(file)}</div></div>; })}
-            {visibleFiles.length === 0 && <p className="empty-state">{inTrash ? "No files in Trash." : "No files found."}</p>}
-          </div></section>
+          {foldersLoading ? <div className="drive-loading-state" role="status" aria-live="polite"><div className="spinner" /><span>Loading your Drive…</span></div> : visibleFolders.length === 0 && visibleFiles.length === 0 && <div className="drive-empty-state">
+              <div className="empty-illustration"><Cloud size={54} strokeWidth={1.35} /><span><Plus size={18} /></span></div>
+              <h2>{search ? "No matching items" : inTrash ? "Trash is empty" : activePage === "Starred" ? "Nothing starred yet" : activePage === "Recent" ? "No recent files" : activePage === "Shared with me" ? "Nothing shared with you yet" : "Your Drive is empty"}</h2>
+              <p>{search ? "Try another search or clear your search." : inTrash ? "Items you move to Trash will appear here." : activePage === "Starred" ? "Star important files and folders to find them here." : activePage === "Recent" ? "Files you open or upload will show up here." : activePage === "Shared with me" ? "Files and folders shared with you will appear here." : "Create a folder or upload a file to get started."}</p>
+            </div>}
+              {visibleFolders.length > 0 && <section className="section folders-section"><h2>Folders</h2><div className={`folder-grid ${view === "list" ? "folder-list" : "explorer-grid"}`}>
+                {visibleFolders.map((folder) => <div className="folder-card" key={folder.id} onDoubleClick={() => { if (!inTrash) { setOpenMenu(null); setCurrentFolder(folder.id); } }}><Folder className="explorer-folder-icon" size={view === "grid" ? 38 : 21} fill="#8ab4f8" color="#6489c8" /><button className="folder-name folder-open" onClick={() => { if (!inTrash) { setOpenMenu(null); setCurrentFolder(folder.id); } }}>{folder.name}</button>{renderMenu({ ...folder, type: "folder" })}</div>)}
+              </div></section>}
+              {visibleFiles.length > 0 && <section className="section files-section"><h2>Files</h2>{view === "grid" ? <div className="file-grid">
+                {visibleFiles.map((file) => { const FileIcon = file.type === "image" ? Image : FileText; return <div className="file-grid-card" key={file.id}><button className="file-grid-open" title={file.name} onClick={() => downloadFile(file)}><FileIcon size={42} strokeWidth={1.5} color={file.type === "image" ? "#3984e8" : "#6b83a6"} /><span>{file.name}</span></button><div className="file-grid-menu">{renderMenu(file)}</div></div>; })}
+              </div> : <div className="file-table"><div className="file-row file-header"><span>Name</span><span>Location</span><span>Last modified</span><span>File size</span><span /></div>
+                {visibleFiles.map((file) => { const FileIcon = file.type === "image" ? Image : FileText; return <div className="file-row" key={file.id}><div className="file-name" onClick={() => { if (inRecent) downloadFile(file); }}><FileIcon size={20} color={file.type === "image" ? "#3984e8" : "#6b83a6"} /><span>{file.name}</span></div><span className="file-location">{inTrash ? itemLocation(file.originalParentId) : itemLocation(file.parentId)}</span><span className="file-updated">{file.updated}</span><span className="file-size">{file.size}</span><div className="file-actions">{renderMenu(file)}</div></div>; })}
+              </div>}</section>}
         </main>
       </div>
       {moveTarget && <div className="modal-backdrop" role="presentation"><div className="modal" role="dialog" aria-modal="true" aria-labelledby="move-title"><div className="modal-header"><h2 id="move-title">Move “{moveTarget.name}”</h2><button className="icon-button" onClick={() => setMoveTarget(null)} aria-label="Close"><X size={18} /></button></div><p>Select a destination folder.</p><div className="destination-list"><button onClick={() => moveItem(moveTarget, null)}><Folder size={18} />My Drive</button>{liveFolders.filter((folder) => folder.id !== moveTarget.id && isOwner(folder) && !(moveTarget.type === "folder" && getDescendantIds(moveTarget.id).has(folder.id))).map((folder) => <button key={folder.id} onClick={() => moveItem(moveTarget, folder.id)}><Folder size={18} />{itemLocation(folder.parentId)} / {folder.name}</button>)}</div></div></div>}
