@@ -1,383 +1,213 @@
-# 🚀 DriveX — Personal Cloud File Management System
+<div align="center">
 
-**DriveX** is a full-stack MERN file management application inspired by Google Drive. It allows users to securely upload, organize, access, search, share, and manage their files through a clean web interface.
+# ☁️ DriveX
 
-Built with React, Node.js, Express.js, and MongoDB, DriveX focuses on **user-level data isolation, secure authentication, organized file management, granular sharing permissions, and file version history**.
+### Your Files. Your Folders. Your Control.
 
-🔗 **GitHub Repository:** [https://github.com/sachinydv0002/DriveX](https://github.com/sachinydv0002/DriveX)
+**A full-stack cloud file management platform built with the MERN stack, featuring secure authentication, file sharing, version history, and cloud storage.**
 
+<p>
+  <a href="https://drivex-orcin.vercel.app/"><strong>🚀 LIVE DEMO</strong></a> &nbsp;•&nbsp;
+  <a href="https://github.com/sachinydv0002/DriveX"><strong>💻 SOURCE CODE</strong></a> &nbsp;•&nbsp;
+  <a href="https://youtu.be/TJr437VDTIU"><strong>▶ WATCH DEMO</strong></a>
+</p>
 
-## 🎥 Quick Project Review:
+<p>
+  <img src="https://img.shields.io/badge/React-Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React and Vite"/>
+  <img src="https://img.shields.io/badge/Node.js-Express-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js and Express"/>
+  <img src="https://img.shields.io/badge/MongoDB-Database-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB"/>
+  <img src="https://img.shields.io/badge/AWS-S3-FF9900?style=for-the-badge&logo=amazons3&logoColor=white" alt="AWS S3"/>
+</p>
 
-https://github.com/user-attachments/assets/ab054b3e-7203-4a8d-aac7-d7dfbebc9542
+<p>
+  <a href="https://drivex-orcin.vercel.app/">
+    <img src="https://img.shields.io/badge/Frontend-Vercel-black?style=flat-square&logo=vercel" alt="Vercel"/>
+  </a>
+  <a href="https://drivex-api-27nq.onrender.com">
+    <img src="https://img.shields.io/badge/Backend-Render-46E3B7?style=flat-square&logo=render&logoColor=black" alt="Render"/>
+  </a>
+  <img src="https://img.shields.io/badge/Storage-Amazon%20S3-FF9900?style=flat-square&logo=amazons3&logoColor=white" alt="Amazon S3"/>
+</p>
 
-
-## 🎥 Full Project Walkthrough:
-
-Watch the full DriveX walkthrough on YouTube:
-
-[![DriveX Project Demo](https://img.youtube.com/vi/TJr437VDTIU/maxresdefault.jpg)](https://youtu.be/TJr437VDTIU)
-
-▶️ **[Watch the full demo on YouTube](https://youtu.be/TJr437VDTIU)**
+</div>
 
 ---
+
+## 📌 About DriveX
+
+DriveX is a cloud-based file management application inspired by modern cloud drives. It helps users upload, organize, search, share, and manage their files through a clean web interface.
+
+The project combines the **MERN stack, MongoDB, AWS S3, and JWT authentication** to build a scalable file management experience.
+
+Designed with a responsive interface for desktop and mobile screens, DriveX focuses on secure access, organized storage, file recovery, and collaboration.
 
 ## ✨ Key Features
 
-### 🔐 1. Secure Authentication & Account Isolation
-
-- User registration and login.
-- Password hashing before storage.
-- JWT-based authentication using HTTP-only cookies.
-- Protected backend routes for authenticated operations.
-- Server-side ownership validation for file and folder operations.
-- **Personal Drive for every user:** Each user can access only their own files and folders unless an item is explicitly shared with them.
-- User-scoped database records help prevent unauthorized cross-account access.
-- Authentication and authorization checks are handled by the backend, not just the frontend.
-
-### 🛡️ 2. Privacy & Safety
-
-- Private files are associated with their owner and should not be accessible to other users by default.
-- Access to shared files and folders is controlled through Viewer and Editor permissions.
-- Authentication tokens are handled using HTTP-only cookies.
-- Passwords are hashed before being stored.
-- Protected operations perform server-side authentication and authorization checks.
-- Revoking a user's sharing access should remove their permission to access the shared resource.
-- Sensitive configuration such as database credentials and JWT secrets belongs in environment variables, not source control.
-
-**Privacy boundary:** DriveX provides application-level access controls; this does not by itself guarantee end-to-end encryption, encryption at rest, or an independent security audit.
-
-### 📁 3. Personal Drive & File Management
-
+### 📂 File & Folder Management
 - Upload and download files.
-- Create and manage folders.
-- Rename and delete files and folders.
-- Move items between folders.
-- Restore items from trash where supported.
-- Organize content in a structured folder hierarchy.
-- Allow multiple files with the same filename.
-- Track file metadata, including names, sizes, and dates.
+- Create, rename, move, and manage folders.
+- Organize files using nested folders.
+- Support multiple files with the same name.
+- Manage deleted items through Trash and recovery features.
 
-### 🌳 4. Nested Folder System
+### 🔐 Authentication & Security
+- User registration and login.
+- JWT-based authentication using HTTP-only cookies.
+- Password hashing.
+- Protected API endpoints.
+- Server-side ownership and authorization checks.
+- User-specific file and folder access.
 
-- Create folders inside other folders.
-- Navigate through a hierarchical folder structure.
-- Organize files into meaningful categories and subfolders.
-- Keep files associated with their intended parent folders.
-- Perform folder operations with backend ownership checks.
+### ☁️ Cloud Storage
+- Amazon S3 integration for cloud object storage.
+- MongoDB for file metadata and application records.
+- Backend-managed file operations.
+- Cloud-based architecture for deployed access.
 
-### 🕘 5. File Version History
+### 🤝 File Sharing & Permissions
+- Share files and folders with other users.
+- Viewer and Editor permission levels.
+- Manage access to shared resources.
+- Revoke access when it is no longer required.
+- Backend authorization for protected operations.
 
-- Maintain previous versions of files.
-- Upload a new version of an existing file.
-- Track version-related metadata.
-- Access available versions through version history.
-- Download a previous version.
-- Restore an earlier version when needed.
+### 🕘 File Version History
+- Maintain previous file versions.
+- Upload newer versions of existing files.
+- Access available version history.
+- Download previous versions.
+- Restore an earlier version when supported.
 
-**Why it matters:** Version history helps users recover earlier file contents instead of relying on a single overwritten copy.
-
-### 🤝 6. Manage Access & File Sharing
-
-- Share files and folders with other users through the access-management system.
-- Assign **Viewer** or **Editor** permissions.
-- Allow owners to revoke access.
-- Restrict Viewer access to permitted operations.
-- Allow Editors to perform authorized editing operations.
-- Enforce access permissions on protected backend routes.
-
-**Granular access control:** Sharing an item should not grant unrestricted access to unrelated users' files or folders.
-
-### 🔎 7. Advanced Search
-
-- Search for files by available metadata.
-- Find files without manually navigating every folder.
-- Narrow down file discovery using the available search functionality.
-- Support a more efficient workflow as the number of stored files grows.
-
-### ⭐ 8. Starred Items
-
+### 🔎 Search & Organization
+- Search files using available metadata.
 - Star important files and folders.
-- Unstar items when they are no longer important.
-- Quickly identify frequently used content.
+- Quickly identify frequently used items.
+- Navigate nested folders.
 
-### 🗑️ 9. Trash & Recovery
-
-- Manage deleted items through the available trash functionality.
-- Restore supported deleted files or folders.
-- Keep deletion and recovery operations subject to backend access checks.
-
-### 🖥️ 10. Modern Web Interface
-
-- React-based user interface.
-- Vite-powered frontend development.
-- Login and signup screens.
-- File and folder management interface.
-- Folder navigation and search.
-- Access management and version history interfaces.
+### 📱 Responsive Web Experience
+- React-based interface.
+- Responsive layouts for desktop and mobile screens.
+- Browser-based access without requiring a separate native mobile app.
+- File and folder management through the web interface.
 
 ---
 
-## 🛠️ Technology Stack
+## 🖥️ Live Application
 
-| Technology                        | Purpose                                 |
-| --------------------------------- | --------------------------------------- |
-| React.js                          | Frontend user interface                 |
-| Vite                              | Frontend development and build tooling  |
-| Node.js                           | JavaScript runtime                      |
-| Express.js                        | Backend API and routing                 |
-| MongoDB                           | Persistent database                     |
-| Mongoose                          | Database models and queries             |
-| JWT                               | Authentication tokens                   |
-| HTTP-only Cookies                 | Authentication cookie handling          |
-| bcrypt / password hashing library | Password protection                     |
-| Multer                            | File upload handling                    |
-| CSS                               | Interface styling                       |
-| Git & GitHub                      | Version control and source code hosting |
+| Component | Link |
+|---|---|
+| 🌐 Frontend | [Open DriveX](https://drivex-orcin.vercel.app/) |
+| ⚙️ Backend API | [DriveX API](https://drivex-api-27nq.onrender.com) |
+| 💻 GitHub Repository | [View Source Code](https://github.com/sachinydv0002/DriveX) |
+| 🎥 Project Walkthrough | [Watch on YouTube](https://youtu.be/TJr437VDTIU) |
 
 ---
 
-## 🏗️ System Architecture
+## 🏗️ Technology Stack
 
-DriveX follows a client-server architecture.
+| Technology | Purpose |
+|---|---|
+| React.js | Frontend user interface |
+| Vite | Frontend development and build tooling |
+| Node.js | Backend runtime |
+| Express.js | REST API and server-side logic |
+| MongoDB Atlas | Hosted database |
+| Mongoose | MongoDB models and queries |
+| Amazon S3 | Cloud object storage |
+| JWT | Authentication |
+| HTTP-only Cookies | Authentication token handling |
+| Multer | File upload handling |
+| CSS | Responsive interface styling |
+| Vercel | Frontend deployment |
+| Render | Backend deployment |
+| Git & GitHub | Version control and source code hosting |
+
+---
+
+## 🔄 How DriveX Works
 
 ```text
-                 ┌──────────────────────┐
-                 │      User Browser    │
-                 │    React + Vite      │
-                 └──────────┬───────────┘
-                            │
-                   HTTP API Requests
-                   HTTP-only Cookies
-                            │
-                 ┌──────────▼───────────┐
-                 │    Express Backend   │
-                 │  Authentication      │
-                 │  Authorization       │
-                 │  File/Folder APIs    │
-                 │  Sharing & Versions  │
-                 └───────┬───────┬──────┘
-                         │       │
-              ┌──────────▼──┐ ┌──▼────────────┐
-              │   MongoDB   │ │ File Storage  │
-              │ Metadata &  │ │ server/uploads│
-              │ User Records│ │               │
-              └─────────────┘ └───────────────┘
+                  👤 User
+                    |
+                    ▼
+          ┌───────────────────┐
+          │   React + Vite    │
+          │  Frontend on      │
+          │     Vercel        │
+          └─────────┬─────────┘
+                    |
+                    ▼
+          ┌───────────────────┐
+          │   Express + Node  │
+          │ Backend on Render│
+          │                   │
+          │ Authentication   │
+          │ File Operations  │
+          │ Sharing & Access │
+          └───────┬─────┬─────┘
+                  |     |
+          ┌───────▼─┐ ┌─▼──────────┐
+          │ MongoDB │ │  Amazon S3 │
+          │ Atlas   │ │            │
+          │         │ │ File Data  │
+          │Metadata │ │  Storage   │
+          └─────────┘ └────────────┘
 ```
 
-### How data isolation works
-
-DriveX uses user ownership and backend authorization to isolate personal data.
-
-- Files and folders are associated with their owners.
-- Protected operations validate the authenticated user.
-- Access to shared items is governed by the application's sharing permissions.
-- MongoDB stores application records, while uploaded file contents are stored locally in the backend's upload directory.
-
-**Note:** User-level isolation does not mean a separate MongoDB database or operating-system folder is automatically created for every account.
+**Data flow:** The frontend communicates with the backend API. MongoDB stores application records and file metadata, while Amazon S3 stores file objects. The backend manages authentication, permissions, and file operations.
 
 ---
 
-## 📂 Project Structure
-
-```text
-DriveX/
-├── client/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   └── App.css
-│   ├── package.json
-│   └── ...
-│
-├── server/
-│   ├── middleware/
-│   │   └── auth.js
-│   ├── models/
-│   │   ├── User.js
-│   │   ├── file.js
-│   │   ├── folder.js
-│   │   └── fileVersion.js
-│   ├── uploads/
-│   ├── server.js
-│   └── ...
-│
-├── .gitignore
-└── README.md
-```
-
----
-
-## ⚙️ Installation & Setup
-
-### Prerequisites
-
-Install the following before running DriveX:
-
-- [Node.js](https://nodejs.org/)
-- [npm](https://www.npmjs.com/)
-- [MongoDB Community Server](https://www.mongodb.com/try/download/community) or a MongoDB-compatible hosted database
-- [Git](https://git-scm.com/)
-
-### Step 1: Clone the repository
-
-```bash
-git clone https://github.com/sachinydv0002/DriveX.git
-cd DriveX
-```
-
-### Step 2: Install backend dependencies
-
-```bash
-cd server
-npm install
-```
-
-### Step 3: Configure backend environment variables
-
-Create a `.env` file inside the `server` directory.
-
-```env
-PORT=5000
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=replace_with_a_long_random_secret
-```
-
-Use the exact MongoDB variable name expected by your backend code. If the project uses a different name, configure that name instead.
-
-**Important:** Never commit your real `.env` file, database credentials, JWT secrets, or authentication cookies to GitHub.
-
-### Step 4: Start the backend
-
-From the `server` directory:
-
-```bash
-node server.js
-```
-
-The backend should connect to MongoDB and start on the configured port.
-
-### Step 5: Install frontend dependencies
-
-Open a second terminal:
-
-```bash
-cd client
-npm install
-```
-
-### Step 6: Configure the frontend API URL
-
-Create `client/.env` if the frontend requires it:
-
-```env
-VITE_API_URL=http://localhost:5000/api
-```
-
-Use the API base URL expected by the existing frontend code. Avoid adding `/api` twice.
-
-### Step 7: Start the frontend
-
-From the `client` directory:
-
-```bash
-npm run dev
-```
-
-Open the local URL displayed by Vite in your browser.
-
----
-
-## 🔒 Security & Privacy Considerations
-
-DriveX includes several security-oriented implementation choices:
+## 🔒 Security & Privacy
 
 - HTTP-only cookies for authentication token handling.
-- Password hashing rather than storing plain-text passwords.
-- Protected API routes.
-- Server-side ownership checks.
-- User-scoped file and folder operations.
-- Permission checks for shared resources.
+- Password hashing.
+- Protected backend routes.
+- Server-side authorization checks.
+- User ownership validation.
+- Viewer and Editor access controls.
 - Environment variables for sensitive configuration.
+- Private cloud storage configuration should prevent unauthorized public access.
 
-### Privacy & safety principles
-
-- **Least privilege:** users should receive only the access granted to them.
-- **Private by default:** sharing should be explicit; do not assume files are public.
-- **Permission revocation:** verify that revoked access no longer works through direct API requests.
-- **Safe error handling:** avoid returning secrets, tokens, internal paths, or sensitive file details in error messages.
-- **Upload safety:** validate uploaded files and prevent unsafe path handling.
-- **Repository hygiene:** exclude `.env` files, authentication cookies, and uploaded user content from Git.
-
-These are implementation and verification goals; do not describe a control as fully enforced until it has been tested against the current backend.
-
-### Deployment security checklist
-
-Before deploying DriveX publicly:
-
-- Configure secure cookies and HTTPS.
-- Configure appropriate CORS and cookie settings.
-- Use a strong, private JWT secret.
-- Keep database credentials out of source control.
-- Review authorization checks for files, folders, nested resources, and versions.
-- Use durable cloud or persistent storage for uploaded files.
-- Test Viewer and Editor permissions with separate accounts.
-- Verify that one user cannot access another user's private files by changing API identifiers.
-
-Security features reduce risk, but the application should not be considered security-audited solely because these mechanisms exist.
+Security depends on the deployed configuration and verified authorization behavior. No independent security audit is claimed.
 
 ---
 
-## 🧪 Testing Checklist
+## 🗺️ Future Improvements
 
-Use this checklist to verify the application before a production release.
+- ⏳ Configurable automatic file expiration.
+- 🖼️ In-browser previews for more file formats.
+- 🔔 Activity notifications.
+- 📊 Storage usage dashboard.
+- 🧪 Automated application tests.
+- ⚡ Performance and search improvements.
 
-- [x] Register a new account and log in.
-- [x] Confirm that unauthenticated requests cannot access protected APIs.
-- [x] Upload and download files.
-- [x] Create nested folders and navigate between them.
-- [x] Rename, move, delete, and restore supported items.
-- [x] Upload files that have duplicate filenames.
-- [x] Star and unstar files or folders.
-- [x] Search for files using the available search options.
-- [x] Share a file or folder with another user.
-- [x] Verify Viewer and Editor restrictions.
-- [x] Revoke a user's access and verify that access is removed.
-- [x] Upload a new file version.
-- [x] Download an earlier version and restore it.
-- [x] Verify that separate users cannot access each other's private data.
-- [x] Verify that application secrets and user uploads are not committed to GitHub.
+**Automatic file expiration is planned, not currently implemented.** A future implementation could remove expired S3 objects and their associated MongoDB metadata and version records after a configurable retention period.
 
 ---
 
-## 🚧 Current Scope & Future Improvements
+## 👨‍💻 Developed By
 
-DriveX is currently designed around local backend file storage and a MongoDB database.
+<div align="center">
 
-Potential future improvements include:
+### Sachin Kumar
 
-- Cloud object storage integration, such as Amazon S3.
-- Deployment with persistent file storage.
-- File previews for supported formats.
-- Improved search and filtering.
-- Automated backend and frontend tests.
-- Activity logs and improved error reporting.
-- Additional file-sharing controls.
-- Production monitoring and performance improvements.
+**B.Tech — Computer Science & Engineering (IoT)**
 
-These are future improvements, not claims that they are already implemented.
+<a href="https://github.com/sachinydv0002">
+  <img src="https://img.shields.io/badge/GitHub-sachinydv0002-181717?style=for-the-badge&logo=github" alt="GitHub Profile"/>
+</a>
 
----
+<a href="https://sachin-portfolio-navy.vercel.app/">
+  <img src="https://img.shields.io/badge/Portfolio-Visit-0A66C2?style=for-the-badge&logo=vercel" alt="Portfolio"/>
+</a>
 
-## 👨‍💻 Author
-
-**Sachin Kumar**
-
-B.Tech — Computer Science and Engineering (IoT)
-
-GitHub: [@sachinydv0002](https://github.com/sachinydv0002)
-
-Project: [DriveX Repository](https://github.com/sachinydv0002/DriveX)
+<a href="https://youtu.be/TJr437VDTIU">
+  <img src="https://img.shields.io/badge/YouTube-Project%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube Demo"/>
+</a>
 
 ---
 
-**DriveX — Your files. Your folders. Your access controls.**
+**DriveX — Your files. Your folders. Your access controls.** ☁️
+
+</div>
