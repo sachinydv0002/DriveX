@@ -967,10 +967,26 @@ function DriveApp({ user, onLogout }) {
   const inShared = activePage === "Shared with me";
   const ownedFolders = liveFolders.filter((folder) => isOwner(folder));
   const ownedFiles = liveFiles.filter((file) => isOwner(file));
+
+  // Recent must not show an item if any parent folder (including a nested ancestor)
+  // has been moved to Trash. Keep this scoped to Recent; other views are unchanged.
+  function hasTrashedAncestor(item) {
+    let parentId = item.parentId;
+    const visited = new Set();
+    while (parentId && !visited.has(parentId)) {
+      visited.add(parentId);
+      const parent = folderById.get(String(parentId));
+      if (!parent) return false;
+      if (parent.trashed) return true;
+      parentId = parent.parentId;
+    }
+    return false;
+  }
+
   const recentItems = [...ownedFolders, ...ownedFiles]
-  .filter((item) => item.createdAt)
-  .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
-  .slice(0, 10);
+    .filter((item) => item.createdAt && !hasTrashedAncestor(item))
+    .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
+    .slice(0, 10);
   const visibleFolders = (inTrash ? folders.filter((folder) => folder.trashed && isOwner(folder)) : query ? liveFolders : inShared ? (currentFolder ? liveFolders.filter((folder) => !isOwner(folder) && folder.parentId === currentFolder) : liveFolders.filter((folder) => !isOwner(folder) && folder.sharedRoot)) : inStarred ? ownedFolders.filter((folder) => folder.starred) : inRecent ? recentItems.filter((item) => item.kind === "folder") : ownedFolders.filter((folder) => folder.parentId === currentFolder))
   .filter((folder) => !query || folder.name.toLowerCase().includes(query));
   const visibleFiles = (inTrash ? files.filter((file) => file.trashed && isOwner(file)) : query ? liveFiles : inShared ? (currentFolder ? liveFiles.filter((file) => !isOwner(file) && file.parentId === currentFolder) : liveFiles.filter((file) => !isOwner(file) && file.sharedRoot)) : inStarred ? ownedFiles.filter((file) => file.starred) : inRecent ? recentItems.filter((item) => item.kind === "file") : ownedFiles.filter((file) => file.parentId === currentFolder))
