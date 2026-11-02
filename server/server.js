@@ -1,9 +1,91 @@
-﻿const mongoose = require("mongoose");
+﻿require("dotenv").config();
+
+const mongoose = require("mongoose");
 const Folder = require("./models/folder");
 const File = require("./models/file");
 const FileVersion = require("./models/fileVersion");
 const User = require("./models/User");
 const { requireAuth } = require("./middleware/auth");
+
+const {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  CopyObjectCommand,
+} = require("@aws-sdk/client-s3");
+
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+const S3_BUCKET = process.env.AWS_S3_BUCKET;
+
+function assertS3Configured() {
+  if (!process.env.AWS_REGION || !process.env.AWS_ACCESS_KEY_ID ||
+      !process.env.AWS_SECRET_ACCESS_KEY || !S3_BUCKET) {
+    throw new Error("AWS S3 is not configured. Check AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_S3_BUCKET.");
+  }
+}
+
+function makeS3Key(userId, originalName) {
+  const safeName = getSafeOriginalName(originalName);
+  const extension = path.extname(safeName).replace(/[^a-zA-Z0-9.]/g, "").slice(0, 20);
+  return `files/${String(userId)}/${crypto.randomUUID()}${extension}`;
+}
+
+async function putLocalFileToS3(localPath, key, contentType) {
+  assertS3Configured();
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: key,
+    Body: fs.createReadStream(localPath),
+    ContentType: contentType || "application/octet-stream",
+  }));
+}
+
+async function copyS3Object(sourceKey, destinationKey, contentType) {
+  assertS3Configured();
+
+  await s3.send(
+    new CopyObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: destinationKey,
+      CopySource: `${S3_BUCKET}/${sourceKey
+        .split("/")
+        .map(encodeURIComponent)
+        .join("/")}`,
+      ContentType: contentType || "application/octet-stream",
+      MetadataDirective: "COPY",
+    })
+  );
+}
+
+async function deleteS3Object(key) {
+  if (!key) return;
+  assertS3Configured();
+  await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+}
+
+function streamS3Download(key, originalName, res) {
+  assertS3Configured();
+  return s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }))
+    .then((result) => {
+      if (result.ContentType) res.setHeader("Content-Type", result.ContentType);
+      if (Number.isFinite(result.ContentLength)) res.setHeader("Content-Length", String(result.ContentLength));
+      res.attachment(getSafeOriginalName(originalName) || "download");
+      result.Body.on("error", (error) => {
+        console.error("S3 download stream error:", error.message);
+        if (!res.headersSent) res.status(500).json({ success: false, message: "Failed to download file" });
+        else res.destroy(error);
+      });
+      result.Body.pipe(res);
+    });
+}
 
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -15,7 +97,9 @@ const crypto = require("crypto");
 
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
+
+const dns = require("node:dns");
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -172,7 +256,8 @@ function getStoredFileMetadata(file, fileId, versionNumber, uploaderId) {
   return {
     fileId,
     versionNumber,
-    storagePath: file.storagePath,
+    s3Key: file.s3Key || "",
+    storagePath: file.storagePath || "",
     originalName: file.originalName,
     mimeType: file.mimeType,
     size: file.size,
@@ -783,13 +868,11 @@ app.post("/api/files", handleSingleFileUpload, async (req, res) => {
   try {
     const originalName = getSafeOriginalName(uploadedFile.originalname);
     const parentId = String(req.body.parentId || "").trim() || null;
-    const storagePath = path.relative(__dirname, uploadedFile.path);
 
     if (!isProduction) {
       console.debug("File upload diagnostics:", {
         hasFile: Boolean(req.file),
         hasOriginalName: Boolean(originalName),
-        storagePath,
         parentId,
         ownerIdPresent: Boolean(req.user?._id),
         ownerIdValid: mongoose.isValidObjectId(req.user?._id),
@@ -828,16 +911,28 @@ app.post("/api/files", handleSingleFileUpload, async (req, res) => {
       return;
     }
 
-    const file = await File.create({
-      name: originalName,
-      originalName,
-      mimeType: uploadedFile.mimetype || "application/octet-stream",
-      size: uploadedFile.size,
-      storagePath,
-      parentId,
-      ownerId: parentFolder ? parentFolder.ownerId : req.user._id,
-      currentUploaderId: req.user._id,
-    });
+    const s3Key = makeS3Key(req.user._id, originalName);
+    await putLocalFileToS3(uploadedFile.path, s3Key, uploadedFile.mimetype);
+    let file;
+    try {
+      file = await File.create({
+        name: originalName,
+        originalName,
+        mimeType: uploadedFile.mimetype || "application/octet-stream",
+        size: uploadedFile.size,
+        s3Key,
+        storagePath: "",
+        parentId,
+        ownerId: parentFolder ? parentFolder.ownerId : req.user._id,
+        currentUploaderId: req.user._id,
+      });
+    } catch (error) {
+      await deleteS3Object(s3Key).catch((cleanupError) =>
+        console.error("S3 upload rollback error:", cleanupError.message)
+      );
+      throw error;
+    }
+    await removeUploadedFile(uploadedFile);
 
     res.status(201).json({
       success: true,
@@ -995,18 +1090,18 @@ app.get("/api/files/:fileId/versions/:versionId/download", async (req, res) => {
     const version = await FileVersion.findOne({ _id: req.params.versionId, fileId: file._id });
     if (!version) return res.status(404).json({ success: false, message: "Version not found" });
 
+    if (version.s3Key) {
+      await streamS3Download(version.s3Key, version.originalName, res);
+      return;
+    }
+
     const storedFilePath = resolveStoredFilePath(version.storagePath);
     if (!storedFilePath) return res.status(404).json({ success: false, message: "Version not found" });
     const storageRoot = await fs.promises.realpath(uploadDir);
     const resolvedFilePath = await fs.promises.realpath(storedFilePath).catch(() => null);
     const physicalRelativePath = resolvedFilePath ? path.relative(storageRoot, resolvedFilePath) : "";
-    if (
-      !resolvedFilePath ||
-      !physicalRelativePath ||
-      physicalRelativePath === ".." ||
-      physicalRelativePath.startsWith(`..${path.sep}`) ||
-      path.isAbsolute(physicalRelativePath)
-    ) {
+    if (!resolvedFilePath || !physicalRelativePath || physicalRelativePath === ".." ||
+        physicalRelativePath.startsWith(`..${path.sep}`) || path.isAbsolute(physicalRelativePath)) {
       return res.status(404).json({ success: false, message: "Version not found" });
     }
     const stats = await fs.promises.stat(resolvedFilePath);
@@ -1032,6 +1127,7 @@ app.post("/api/files/:id/versions", handleSingleFileUpload, async (req, res) => 
 
   let createdVersion = null;
   let fileUpdated = false;
+  let newS3Key = null;
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
       await removeUploadedFile(uploadedFile);
@@ -1054,25 +1150,23 @@ app.post("/api/files/:id/versions", handleSingleFileUpload, async (req, res) => 
     }
 
     const versionNumber = await getNextVersionNumber(file._id);
-    const previousVersion = await FileVersion.findOne({ fileId: file._id, versionNumber: versionNumber - 1 });
-    if (!previousVersion) {
-      createdVersion = await FileVersion.create({
-        ...getStoredFileMetadata(file, file._id, versionNumber, file.currentUploaderId || file.ownerId),
-      });
-    } else {
-      createdVersion = await FileVersion.create({
-        ...getStoredFileMetadata(file, file._id, versionNumber, req.user._id),
-      });
-    }
+    createdVersion = await FileVersion.create({
+      ...getStoredFileMetadata(file, file._id, versionNumber, file.currentUploaderId || file.ownerId),
+    });
+
+    newS3Key = makeS3Key(req.user._id, originalName);
+    await putLocalFileToS3(uploadedFile.path, newS3Key, uploadedFile.mimetype);
 
     file.originalName = originalName;
     file.name = originalName;
     file.mimeType = uploadedFile.mimetype || "application/octet-stream";
     file.size = uploadedFile.size;
-    file.storagePath = path.relative(__dirname, uploadedFile.path);
+    file.s3Key = newS3Key;
+    file.storagePath = "";
     file.currentUploaderId = req.user._id;
     await file.save();
     fileUpdated = true;
+    await removeUploadedFile(uploadedFile);
 
     return res.status(201).json({
       success: true,
@@ -1083,6 +1177,7 @@ app.post("/api/files/:id/versions", handleSingleFileUpload, async (req, res) => 
   } catch (error) {
     if (!fileUpdated) {
       if (createdVersion) await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => {});
+      if (newS3Key) await deleteS3Object(newS3Key).catch(() => {});
       await removeUploadedFile(uploadedFile);
     }
     console.error("Create file version error:", error.message);
@@ -1094,48 +1189,51 @@ app.post("/api/files/:id/versions", handleSingleFileUpload, async (req, res) => 
 });
 
 app.post("/api/files/:fileId/versions/:versionId/restore", async (req, res) => {
-  let copiedPath = null;
   let createdVersion = null;
   let fileUpdated = false;
+  let newS3Key = null;
   try {
     if (!mongoose.isValidObjectId(req.params.fileId) || !mongoose.isValidObjectId(req.params.versionId)) {
       return res.status(404).json({ success: false, message: "Version not found" });
     }
     const file = await File.findById(req.params.fileId);
-    if (!file || file.trashed) {
-      return res.status(404).json({ success: false, message: "File not found" });
-    }
+    if (!file || file.trashed) return res.status(404).json({ success: false, message: "File not found" });
     if (!(await requireEditorOrOwner(file, req, res))) return;
+
     const selectedVersion = await FileVersion.findOne({ _id: req.params.versionId, fileId: file._id });
     if (!selectedVersion) return res.status(404).json({ success: false, message: "Version not found" });
-
-    const sourcePath = resolveStoredFilePath(selectedVersion.storagePath);
-    if (!sourcePath) return res.status(404).json({ success: false, message: "Version contents not found" });
-    const storageRoot = await fs.promises.realpath(uploadDir);
-    const resolvedSourcePath = await fs.promises.realpath(sourcePath).catch(() => null);
-    const sourceRelativePath = resolvedSourcePath ? path.relative(storageRoot, resolvedSourcePath) : "";
-    if (
-      !resolvedSourcePath ||
-      !sourceRelativePath ||
-      sourceRelativePath === ".." ||
-      sourceRelativePath.startsWith(`..${path.sep}`) ||
-      path.isAbsolute(sourceRelativePath)
-    ) {
-      return res.status(404).json({ success: false, message: "Version contents not found" });
-    }
-    const uniqueName = `${Date.now()}-${crypto.randomUUID()}${path.extname(getSafeOriginalName(selectedVersion.originalName))}`;
-    copiedPath = path.join(uploadDir, uniqueName);
-    await fs.promises.copyFile(resolvedSourcePath, copiedPath);
 
     const versionNumber = await getNextVersionNumber(file._id);
     createdVersion = await FileVersion.create({
       ...getStoredFileMetadata(file, file._id, versionNumber, file.currentUploaderId || file.ownerId),
     });
+
+    newS3Key = makeS3Key(req.user._id, selectedVersion.originalName);
+    if (selectedVersion.s3Key) {
+      await copyS3Object(selectedVersion.s3Key, newS3Key, selectedVersion.mimeType);
+    } else {
+      const sourcePath = resolveStoredFilePath(selectedVersion.storagePath);
+      if (!sourcePath) {
+        await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => {});
+        return res.status(404).json({ success: false, message: "Version contents not found" });
+      }
+      const storageRoot = await fs.promises.realpath(uploadDir);
+      const resolvedSourcePath = await fs.promises.realpath(sourcePath).catch(() => null);
+      const sourceRelativePath = resolvedSourcePath ? path.relative(storageRoot, resolvedSourcePath) : "";
+      if (!resolvedSourcePath || !sourceRelativePath || sourceRelativePath === ".." ||
+          sourceRelativePath.startsWith(`..${path.sep}`) || path.isAbsolute(sourceRelativePath)) {
+        await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => {});
+        return res.status(404).json({ success: false, message: "Version contents not found" });
+      }
+      await putLocalFileToS3(resolvedSourcePath, newS3Key, selectedVersion.mimeType);
+    }
+
     file.originalName = selectedVersion.originalName;
     file.name = selectedVersion.originalName;
     file.mimeType = selectedVersion.mimeType;
     file.size = selectedVersion.size;
-    file.storagePath = path.relative(__dirname, copiedPath);
+    file.s3Key = newS3Key;
+    file.storagePath = "";
     file.currentUploaderId = req.user._id;
     await file.save();
     fileUpdated = true;
@@ -1148,7 +1246,7 @@ app.post("/api/files/:fileId/versions/:versionId/restore", async (req, res) => {
   } catch (error) {
     if (!fileUpdated) {
       if (createdVersion) await FileVersion.deleteOne({ _id: createdVersion._id }).catch(() => {});
-      if (copiedPath) await removeUploadedFile({ path: copiedPath });
+      if (newS3Key) await deleteS3Object(newS3Key).catch(() => {});
     }
     console.error("Restore file version error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to restore version" });
@@ -1171,6 +1269,11 @@ app.get("/api/files/:id/download", async (req, res) => {
         success: false,
         message: "File not found",
       });
+    }
+
+    if (file.s3Key) {
+      await streamS3Download(file.s3Key, file.originalName, res);
+      return;
     }
 
     const storedFilePath = resolveStoredFilePath(file.storagePath);
@@ -1571,10 +1674,15 @@ async function permanentlyDeleteDocument(Model, req, res) {
       });
     }
 
-    await Model.deleteOne({ _id: item._id, ownerId: req.user._id });
     if (Model.modelName === "File") {
+      const versions = await FileVersion.find({ fileId: item._id }).select("s3Key");
+      const keys = [...new Set([item.s3Key, ...versions.map((version) => version.s3Key)].filter(Boolean))];
+      for (const key of keys) {
+        await deleteS3Object(key);
+      }
       await FileVersion.deleteMany({ fileId: item._id });
     }
+    await Model.deleteOne({ _id: item._id, ownerId: req.user._id });
 
     res.json({
       success: true,
@@ -1597,16 +1705,23 @@ app.delete("/api/files/:id/permanent", (req, res) =>
   permanentlyDeleteDocument(File, req, res)
 );
 
+
+
 async function startServer() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/DriveX");
+    await mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/DriveX", {
+      serverSelectionTimeoutMS: 10000,
+    });
+
     console.log("MongoDB connected successfully!");
 
     app.listen(PORT, () => {
       console.log(`DriveX backend running at http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error("MongoDB connection failed:", error.stack || error.message);
+    console.error("MongoDB connection failed:", error.message);
+    console.error("Error reason:", error.reason);
+    console.error("Error code:", error.code);
     process.exitCode = 1;
   }
 }
