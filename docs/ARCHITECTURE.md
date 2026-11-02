@@ -1,101 +1,170 @@
 # DriveX Architecture
 
-## 1. Project Overview
+DriveX is a MERN-stack file management application that enables users to upload, organize, manage, and share files through a secure web interface.
 
-DriveX is a MERN-stack cloud file management application inspired by Google Drive. It allows authenticated users to organize files and folders, manage file versions, and share resources with other users.
+## 📐 High-Level Architecture
 
-## 2. Technology Stack
+```mermaid
+flowchart TD
+    U[User] --> FE[React Frontend]
+    FE --> API[Express REST API]
 
-- **Frontend:** React.js
-- **Backend:** Node.js and Express.js
-- **Database:** MongoDB with Mongoose
-- **Authentication:** JWT-based cookie authentication
-- **File Storage:** Server-side upload storage
+    API --> AUTH[JWT Cookie Authentication]
+    AUTH --> ROUTES[File and Folder Routes]
 
-## 3. High-Level Architecture
+    ROUTES --> PERM[Ownership and Access Checks]
+    PERM --> DB[(MongoDB)]
 
-```text
-User
-  |
-  v
-React Frontend
-  |
-  v
-Express REST API
-  |
-  +---- Authentication Middleware
-  |
-  +---- File and Folder Routes
-  |
-  +---- Version and Sharing Routes
-  |
-  +---- MongoDB (Metadata)
-  |
-  +---- File Storage (Uploaded Contents)
+    PERM --> STORAGE[Configured File Storage]
+    ROUTES --> VERSION[File Versioning]
+    ROUTES --> SHARE[Sharing and Permissions]
+
+    VERSION --> DB
+    VERSION --> STORAGE
+    SHARE --> DB
 ```
 
-## 4. Main Components
+## 🛠️ Technology Stack
 
-### Frontend
+| Layer | Technology | Responsibility |
+|---|---|---|
+| Frontend | React.js | User interface and file management |
+| Backend | Node.js, Express.js | REST API and business logic |
+| Database | MongoDB, Mongoose | Users and resource metadata |
+| Authentication | JWT, HTTP-only cookies | Session authentication |
+| File Storage | Configured storage provider | Uploaded file contents |
 
-The React application provides the user interface for browsing folders, uploading files, renaming and moving items, managing trash, viewing versions, and sharing resources.
+## 🧩 Core Components
 
-### Backend
+### 1. Frontend
 
-The Express server handles API requests, validates input, authenticates users, checks access permissions, and coordinates database and file-storage operations.
+The React application provides the interface for:
 
-### Database
+- Browsing files and nested folders
+- Uploading and downloading files
+- Renaming and moving resources
+- Managing starred items and trash
+- Viewing file versions
+- Sharing files and folders
 
-MongoDB stores application records such as users, file metadata, folder metadata, and file-version information.
+### 2. Backend API
 
-### File Storage
+The Express server processes client requests and coordinates application operations.
 
-Uploaded file contents are stored separately from MongoDB metadata. The configured storage implementation should be verified in the server code.
+Its responsibilities include:
 
-## 5. Data Models
+- Authentication and request validation
+- File and folder management
+- Ownership and permission checks
+- File version management
+- Sharing and access control
+- Database and storage operations
 
-### User
+### 3. Database Layer
 
-Represents an account used for authentication and resource ownership.
+MongoDB stores application data through Mongoose models.
 
-### File
+The main data entities are:
 
-Stores file information such as filename, size, MIME type, owner, folder reference, timestamps, and applicable sharing or trash metadata.
+| Entity | Purpose |
+|---|---|
+| User | Account and ownership information |
+| File | File metadata and associated references |
+| Folder | Folder metadata and parent relationships |
+| File Version | Information about previous file versions |
 
-### Folder
+The exact schema fields and relationships should be confirmed against the current models.
 
-Represents a folder and its relationship to its parent folder, enabling nested folder navigation.
+### 4. File Storage Layer
 
-### File Version
+File contents are stored separately from MongoDB metadata.
 
-Stores information about previous versions of a file so that supported versions can be listed, downloaded, or restored.
+The active storage provider and its configuration must be verified in the backend source code before documenting implementation-specific details.
 
-## 6. Authentication and Authorization
+## 🔄 File Upload Data Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as React Frontend
+    participant API as Express API
+    participant DB as MongoDB
+    participant FS as File Storage
+
+    User->>FE: Select file
+    FE->>API: Authenticated upload request
+    API->>API: Authenticate and validate request
+    API->>API: Check ownership and permissions
+    API->>FS: Store file content
+    FS-->>API: Storage result
+    API->>DB: Save file metadata
+    DB-->>API: Saved record
+    API-->>FE: Return operation result
+    FE-->>User: Update file listing
+```
+
+*The diagram represents the intended flow. Actual execution order and failure handling depend on the implemented upload handler.*
+
+## 🔐 Authentication and Authorization
 
 DriveX uses JWT-based cookie authentication.
 
-Protected API requests must identify the authenticated user. File and folder operations must verify ownership or the permissions granted through sharing.
+- HTTP-only cookies help prevent JavaScript from directly reading session tokens.
+- Protected endpoints must authenticate requests.
+- Resource operations must enforce ownership.
+- Shared resources must respect granted permissions.
+- Viewer and Editor restrictions must be enforced by the backend.
 
-Viewer and Editor access should be enforced by the backend, not only by hiding frontend controls.
+Frontend restrictions alone are not sufficient for access control.
 
-## 7. File Management Flow
+## 📁 File and Folder Management
 
-1. The user selects a file in the frontend.
-2. The frontend sends an authenticated request to the backend.
-3. The backend validates the request and checks permissions.
-4. The file content is stored in the configured storage layer.
-5. MongoDB records the corresponding metadata.
-6. The backend returns the operation result to the frontend.
+The application supports file and folder operations through the REST API.
 
-## 8. Security and Data Integrity
+Key capabilities include:
+
+- Nested folder organization
+- File uploads and downloads
+- Rename and move operations
+- Trash and restoration
+- Permanent deletion
+- Starred items
+- File version management
+- Sharing and access control
+
+## 🗃️ Data Relationships
+
+```mermaid
+erDiagram
+    USER ||--o{ FILE : owns
+    USER ||--o{ FOLDER : owns
+    FOLDER o|--o{ FILE : contains
+    FOLDER o|--o{ FOLDER : contains
+    FILE ||--o{ FILE_VERSION : has
+```
+
+This is a conceptual relationship diagram, not a verified representation of the exact Mongoose schemas.
+
+## 🛡️ Security and Data Integrity
+
+The architecture should enforce the following safeguards:
 
 - Authenticate protected requests.
+- Validate identifiers and user input.
 - Verify ownership and sharing permissions.
-- Validate file and folder identifiers and user input.
-- Prevent unsafe file paths and unauthorized file access.
-- Keep secrets in environment variables.
-- Handle upload failures without leaving inconsistent metadata or incomplete files.
+- Prevent unauthorized file access and unsafe path handling.
+- Keep credentials and secrets in environment variables.
+- Handle storage and database failures safely.
+- Avoid inconsistent metadata when uploads or deletions fail.
 
-## 9. Limitations and Verification
+## ⚠️ Implementation Notes
 
-This document describes the intended architecture. Confirm the exact model fields, indexes, storage implementation, upload-failure handling, and permission rules against the current source code before claiming that every behavior is implemented.
+This document describes the architecture and intended responsibilities of DriveX. Verify the following against the current source code before treating them as confirmed implementation details:
+
+- Active file storage provider
+- Exact Mongoose schemas and relationships
+- Authentication middleware behavior
+- Viewer and Editor permission enforcement
+- File-version storage and restoration
+- Upload and deletion failure handling
+- Database indexes and validation rules
