@@ -1534,3 +1534,63 @@ input:focus-visible {
 .details-row { display: flex; justify-content: space-between; gap: 18px; border-top: 1px solid #edf0f4; padding-top: 10px; font-size: 13px; }
 .details-row span:first-child { color: #687078; }
 .details-row span:last-child { text-align: right; overflow-wrap: anywhere; }
+
+
+/* File-click download confirmation */
+.download-confirm-modal {
+  width: min(420px, 100%);
+}
+.download-confirm-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 20px 0 24px;
+}
+.download-confirm-content p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.download-confirm-content p strong {
+  color: #202124;
+}
+.download-confirm-icon {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #3984e8;
+  background: #eaf2ff;
+}
+.download-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.download-confirm-actions button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.download-cancel-button {
+  border: 1px solid #dadce0;
+  background: #fff;
+  color: #3c4043;
+}
+.download-confirm-button {
+  border: 1px solid #1a73e8;
+  background: #1a73e8;
+  color: #fff;
+}
+.download-confirm-actions button:focus-visible {
+  outline: 2px solid #174ea6;
+  outline-offset: 2px;
+}
